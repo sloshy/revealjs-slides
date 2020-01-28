@@ -48,17 +48,6 @@
           <p class="fragment">FS2 is inspired by - and also inspires - other libraries from other ecosystems.</p>
           <p class="fragment">Most things here are applicable in almost any other language or streaming library.</p>
         </section>
-        <section>
-          <h2>Contents</h2>
-          <ol>
-            <li>My History With Streams</li>
-            <li>A Streaming Vocabulary</li>
-            <li>Streams Are... "Confusing?"</li>
-            <li>A "YAGNI" Fallacy</li>
-            <li>A Stream of Inspiration</li>
-            <li>Streaming Patterns</li>
-          </ol>
-        </section>
       </section>
       <section>
         <section>
@@ -319,7 +308,9 @@ runQuery.flatMap(user => IO(println(user)))
         </section>
         <section>
           <p>Queries can also be streamed</p>
-          <pre><code class="hljs scala" data-trim data-line-numbers="|3|5|6|">
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1|5|7|8|">
+def sendBetaInvite(u: UserAccount): IO[Unit]
+
 sql"SELECT username, email FROM users WHERE banned = false"
   .query[(String, String)]
   .stream //Stream[ConnectionIO, (String, String)]
@@ -338,7 +329,7 @@ sql"SELECT username, email FROM users WHERE banned = false"
 def sendWorkRequest(work: UnitOfWork): IO[Unit] = ???
 def parseUnitOfwork(s: String): Option[UnitOfWork] = ???
 
-val routes = HttpRoutes[IO].of {
+val routes = HttpRoutes.of[IO] {
   case req @ POST -> Root / "work" / "submit" =>
     req.through(fs2.text.utf8decode)
       .through(fs2.text.lines)
