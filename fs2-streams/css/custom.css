@@ -1,0 +1,11 @@
+.mono {
+  font-family: monospace;
+  background: #272822;
+  padding: 5px;
+}
+
+.mono-pad {
+  font-family: monospace;
+  background: #272822;
+  padding: 10px;
+}
