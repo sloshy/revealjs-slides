@@ -249,16 +249,9 @@ printeverything.unsafeRunSync()
             <li>With Akka Actors you get concurrent state and reactive, message-based programming</li>
             <li class="fragment">Actor "mailboxes" are either unbounded (default) or have a "dead letter queue"</li>
             <li class="fragment">This is a lot to think about sometimes</li>
-            <li class="fragment">Personally? I just find actor-based programming confusing</li>
             <li class="fragment">"Actors" are a great concept - just not a great default tool</li>
           </ul>
         </section>
-        <!-- <section>
-          <h2>A Bit About Actors</h2>
-          <p>Akka Streams is an actor-based streaming solution</p>
-          <p>Actors are "push-based" and queue up - takes a lot of boilerplate to make streaming work</p>
-          <p>This is because actors do not handle "backpressure"</p>
-        </section> -->
       </section>
       <section>
         <section>
@@ -276,6 +269,7 @@ def getStringOne: String
 /** Returns `None` if no string exists */
 def getStringTwo: Option[String]
           </code></pre>
+          <p class="fragment">Types/Abstractions lift complexity out of your head</p>
         </section>
         <section>
           <p>Abstractions can be premature,</p>
@@ -322,7 +316,7 @@ val outFile = docPath.resolveSibling("out.txt")
 fs2.io.file.walk(blocker, homePath).flatMap { path =>
   //Read the file in, 512 bytes at a time
   fs2.io.file.readAll(path, blocker, 512)
-    .through(fs2.text.decodeUtf8) //Decode to String
+    .through(fs2.text.utf8Decode) //Decode to String
     .through(fs2.text.lines) //Extract lines
     .filter(_.toLowerCase.contains("password"))
     .through(fs2.io.writeAll[IO](outFile, blocker))
@@ -350,7 +344,7 @@ runQuery.flatMap(user => IO(println(user)))
         </section>
         <section>
           <p>Queries can also be streamed</p>
-          <pre><code class="hljs scala" data-trim data-line-numbers="|1|5|7|8|">
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1|3-10|5|7|8|">
 def sendBetaInvite(u: UserAccount): IO[Unit]
 
 sql"SELECT username, email FROM users WHERE banned = false"
@@ -365,7 +359,7 @@ sql"SELECT username, email FROM users WHERE banned = false"
           <p class="fragment"><span class="mono">parEvalMap</span> runs N evaluations in parallel</p>
         </section>
         <section>
-          <h3>http4s - Streaming Requests</h3>
+          <h3>http4s - Streaming HTTP</h3>
           <p>http4s is a pure HTTP server and client library</p>
           <pre><code class="hljs scala" data-trim data-line-numbers="|1,2|4|4-14|">
 def sendWorkRequest(work: UnitOfWork): IO[Unit] = ???
@@ -391,7 +385,7 @@ val routes = HttpRoutes.of[IO] {
 def runScript(blocker: Blocker, client: Client[F], cc: ConnectionConfig)(implicit F: FunctorRaise[F, Client.Error]) {
   client.exec(connectionConfig, "/path/to/script.sh", blocker) { process =>
     process.stdout //A stream of raw byte output
-      .through(fs2.text.decodeUtf8)
+      .through(fs2.text.utf8Decode)
       .through(fs2.text.lines)
       .filterNot(_.contains("log"))
       .showLinesStdout
@@ -479,8 +473,39 @@ val fauxFlux for {
 fauxFlux.unsafeRunAsync() //Need to do this in ScalaJS
                       </code></pre>
           <!-- TODO: put actual button here w/ scalajs -->
-          <p>Live demo --></p>
+          <p>Live demo --> (todo)</p>
         </section>
+        <section>
+          <h3>Streaming for Batches</h3>
+          <p>Common misconception:</p>
+          <p>"Streaming" only makes sense for "streaming apps"</p>
+          <p class="fragment">You'd only be making things harder on yourself!</p>
+          <ul class="fragment">
+            <li>Run 1 DB query? <span class="fragment it">Start processing immediately!</span></li>
+            <li>Processing a single file? <span class="fragment it">Process it in parallel!</span></li>
+            <li>Doing literally anything else? <span class="fragment it">Try streaming it anyway!</span></li>
+          </ul>
+          <p class="fragment">TL;DR: Streams are useful in finite and infinite use-cases equally</p>
+        </section>
+      </section>
+      <section>
+        <h3>Further Reading:</h3>
+        <p>Presentations:</p>
+        <ul>
+          <li><a href="https://www.youtube.com/watch?v=30q6BkBv5MY">Functional Programming With Effects - Rob Norris</a>
+          </li>
+          <li><a href="https://www.youtube.com/watch?v=YSN__0VEsaw">Declarative Control Flow with FS2 Stream - Fabio
+              Labella</a></li>
+          <li><a href="https://www.youtube.com/watch?v=urdtmx4h5LE">http4s: pure, typeful functional HTTP in Scala -
+              Ross Baker</a></li>
+        </ul>
+        <p>On the web:</p>
+        <ul>
+          <li><a href="https://fs2.io/">FS2 Website - https://fs2.io/</a></li>
+          <li><a href="https://gitter.im/functional-streams-for-scala/fs2">FS2 Gitter -
+              https://gitter.im/functional-streams-for-scala/fs2</a></li>
+          <li><a href="https://leanpub.com/pfp-scala">Practical FP in Scala - Gabriel Volpe</a></li>
+        </ul>
       </section>
     </div>
   </div>

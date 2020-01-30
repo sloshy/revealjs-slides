@@ -9,3 +9,8 @@
   background: #272822;
   padding: 10px;
 }
+
+.it {
+  font-style: italic;
+  text-decoration: underline;
+}
