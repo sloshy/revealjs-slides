@@ -171,16 +171,10 @@ printeverything.unsafeRunSync()
       </section>
       <section>
         <section>
-          <h2>Streams are... Complicated?</h2>
+          <h2>Are Streams Necessary?</h2>
         </section>
         <section>
-          <ul>
-            <li>Joined Rewards Network in 2018</li>
-            <li>Started out w/ Akka & Akka Streams</li>
-            <li>Not everyone was super FP-familiar</li>
-          </ul>
-        </section>
-        <section>
+          <h3>An Event At Work</h3>
           <ul>
             <li>We had an event-driven application</li>
             <li class="fragment">...Implemented with loops and mutability</li>
@@ -192,7 +186,7 @@ printeverything.unsafeRunSync()
         <section>
           <h3>Diagnosing the issues</h3>
           <ol>
-            <li>Akka Streams is conceptually large</li>
+            <li>Akka Streams came across as complicated and confusing</li>
             <li>Cost/Benefit of bringing in a library "just" to solve a simple, one-off problem</li>
             <li>Misconceptions as to when streams are "necessary"</li>
           </ol>
@@ -219,8 +213,45 @@ printeverything.unsafeRunSync()
         </section>
         <section>
           <h3>When are streams "necessary?"</h3>
-          <p class="fragment">The answer...</p>
-          <p class="fragment">...Is a lot more often than you'd think!</p>
+          <p class="fragment">In software, "necssary" just means "easier/better"</p>
+          <p class="fragment">The real question is...</p>
+          <p class="fragment">...what are our alternatives?</p>
+        </section>
+        <section>
+          <h3>Stream "Alternatives"</h3>
+          <ul>
+            <li>
+              Looping by hand
+              <ul>
+                <li class="fragment">...no</li>
+              </ul>
+            </li>
+            <li>
+              Stream/LazyList
+              <ul>
+                <li class="fragment">Can represent infinitely-repeating tasks</li>
+                <li class="fragment">Also requires infinite memory!</li>
+              </ul>
+            </li>
+            <li>
+              Iterator
+              <ul>
+                <li class="fragment">Can be made infinite</li>
+                <li class="fragment">Handling concurrency, reactivity is a hassle</li>
+                <li class="fragment">Mutable, unsafe, and unsuitable for pure FP</li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+        <section>
+          <h3>What about Actors?</h3>
+          <ul>
+            <li>With Akka Actors you get concurrent state and reactive, message-based programming</li>
+            <li class="fragment">Actor "mailboxes" are either unbounded (default) or have a "dead letter queue"</li>
+            <li class="fragment">This is a lot to think about sometimes</li>
+            <li class="fragment">Personally? I just find actor-based programming confusing</li>
+            <li class="fragment">"Actors" are a great concept - just not a great default tool</li>
+          </ul>
         </section>
         <!-- <section>
           <h2>A Bit About Actors</h2>
@@ -252,6 +283,17 @@ def getStringTwo: Option[String]
           <p class="fragment">Bad abstractions have limited applicability.</p>
           <p class="fragment">Good abstractions show their usefulness everywhere.</p>
           <p class="fragment">All abstractions - good and bad - require learning first.</p>
+        </section>
+        <section>
+          <h3>Streams are a Good Abstraction</h3>
+          <p>Streams, in many libraries (but especially FS2):</p>
+          <ul>
+            <li class="fragment">Represent a "linear thread of execution"</li>
+            <li class="fragment">Handle the possibility of asynchrony with ease</li>
+            <li class="fragment">Have minimal boilerplate</li>
+            <li class="fragment">Are declarative and easily composable</li>
+          </ul>
+          <p class="fragment">So why not use them almost everywhere?</p>
         </section>
       </section>
       <section>
@@ -418,54 +460,28 @@ val stateProgram: IO[(List[Int], Int)] = for {
           <p class="fragment">*Shill Alert: I wrote this one!</p>
           <p class="fragment">Also includes a state cache & other helpful utils</p>
         </section>
-      </section>
-      <!-- <section> -->
-      <!-- <section>
-          <h2>A Path to FS2 Streaming</h2>
-        </section>
         <section>
-          <h2>Loops (Yay...)</h2>
-          <pre><code class="hljs scala" data-line-numbers="|1|3-7|9-13" data-trim>
-val list = List(1, 2, 3)
+          <p>Lets get reactive!</p>
+          <pre><code class="hljs scala" data-trim>
+import fs2.concurrent.Queue
 
-//Using a classic "for-loop"
-for { i <- (0 to (list.length - 1)) } yield {
-  val next = list(i)
-  println(next)
-}
+def renderButton(count: Int, increase: IO[Unit]): IO[Unit]
 
-//Using an Iterator
-val it = list.iterator
-while (it.hasNext) {
-  println(it.next)
-}
-          </code></pre>
-        </section>
-        <section>
-          <h2>Lets Get Functional!</h2>
-          <pre><code class="hljs scala" data-line-numbers="|1|3,4|6-8|10,11" data-trim>
-val list = List(1, 2, 3)
+val fauxFlux for {
+  q <- Queue.unbounded[IO, Int]
+  es <- EventState[IO].initial[Int, Int](0)(_ + _)
+  _ <- renderButton(0, q.enqueue(1))
+  s1 = q.dequeue.through(es.hookup)
+  s2 = s.evalMap(i => renderButton(i, q.enqueue(1)))
+  _ <- s2.compile.drain
+} yield ()
 
-//The magic of "forEach" :O
-list.forEach(println)
-
-//Infinite collections with Stream/LazyList
-val lazyList = LazyList.iterate(0)(_ + 1)
-lazyList.forEach(println) //Will run forever
-
-//Infinite collections until an arbitrary point
-lazyList.take(256).forEach(println) //Will print 256 times
-          </code></pre>
+fauxFlux.unsafeRunAsync() //Need to do this in ScalaJS
+                      </code></pre>
+          <!-- TODO: put actual button here w/ scalajs -->
+          <p>Live demo --></p>
         </section>
       </section>
-      <section>
-        <h2>Lets Go Further</h2>
-        <ol>
-          <li class="fragment">Asynchronicity</li>
-          <li class="fragment">Represent a long-running program</li>
-          <li class="fragment">Handle side-effects (eventually)</li>
-        </ol>
-      </section> -->
     </div>
   </div>
 
