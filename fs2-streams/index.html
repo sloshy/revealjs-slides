@@ -86,7 +86,7 @@
         <section>
           <h2>Takeaways:</h2>
           <ul>
-            <li>Streaming "can be" async - but doesn't have to be</li>
+            <li>Streams "can be" async - but don't have to be</li>
             <li>Useful as a general-purpose primitive</li>
             <li>"Observables" == "Streams" in other libs</li>
             <p>(PS: Monix is like ReactiveX in Scala)</p>
@@ -213,7 +213,7 @@ printeverything.unsafeRunSync()
         </section>
         <section>
           <h3>When are streams "necessary?"</h3>
-          <p class="fragment">In software, "necssary" just means "easier/better"</p>
+          <p class="fragment">In software, "necessary" just means "easier/better"</p>
           <p class="fragment">The real question is...</p>
           <p class="fragment">...what are our alternatives?</p>
         </section>
@@ -367,7 +367,7 @@ def parseUnitOfwork(s: String): Option[UnitOfWork] = ???
 
 val routes = HttpRoutes.of[IO] {
   case req @ POST -> Root / "work" / "submit" =>
-    req.through(fs2.text.utf8decode)
+    req.body.through(fs2.text.utf8decode)
       .through(fs2.text.lines)
       .map(parseUnitOfWork)
       .unNone //Filters out "None" from the stream
@@ -422,19 +422,19 @@ Stream(
         <section>
           <h3>Event-driven State</h3>
           <p>Front-end and back-end apps can benefit from having state be event-driven</p>
-          <p>Sometimes called "Event Sourcing"</p>
-          <p>Also used in Flux/Redux in JavaScript</p>
+          <p>Key in "Event Sourcing", Flux/Redux, etc.</p>
           <pre><code class="hljs scala" data-trim>
-val accumulateState: Pipe[Pure, Int, Int] = { stream =>
-  stream.scan(0)(_ + _)
-}
+def accumulateState(state: Int, next: Int) = state + next
 
 val eventStream = Stream(1, 2, 3)
 
-val finalState = eventStream
-  .through(accumulateState)
-  .compile
-  .lastOrError //Final state is 6
+//".fold" on a Stream gives you a stream of 1 element
+//".compile.fold" gives you the final accumulated value
+val finalState = eventStream.compile.fold(0)(accumulateState)
+//finalState == Some(6)
+
+//Want all intermediate states? Just use "scan"
+val allIntermediateStates = eventStream.scan(0)(accumulateState)
           </code></pre>
         </section>
         <section>
@@ -470,7 +470,7 @@ val fauxFlux for {
   _ <- s2.compile.drain
 } yield ()
 
-fauxFlux.unsafeRunAsync() //Need to do this in ScalaJS
+fauxFlux.unsafeRunAsyncAndForget()
                       </code></pre>
           <!-- TODO: put actual button here w/ scalajs -->
           <p>Live demo --> (todo)</p>
