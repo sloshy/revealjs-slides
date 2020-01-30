@@ -145,9 +145,9 @@ def putstrln(s: String): IO[Unit] = IO(println(s))
 val pureStream = Stream(1, 2, 3)
 val printEverything: IO[Unit] =
   pureStream
-    .evalMap(putstrln) //Now we have a Stream[IO, Int]
+    .evalTap(putstrln) //Now we have a Stream[IO, Int]
     .compile
-    .drain //Discards all results, since "Unit" is useless
+    .drain //Discards all results
 
 //Prints 1, 2, 3 on separate lines
 printeverything.unsafeRunSync()
@@ -461,7 +461,7 @@ import fs2.concurrent.Queue
 
 def renderButton(count: Int, increase: IO[Unit]): IO[Unit]
 
-val fauxFlux for {
+val fauxFlux = for {
   q <- Queue.unbounded[IO, Int]
   es <- EventState[IO].initial[Int, Int](0)(_ + _)
   _ <- renderButton(0, q.enqueue(1))
