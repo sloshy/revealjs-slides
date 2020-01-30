@@ -145,9 +145,9 @@ def putstrln(s: String): IO[Unit] = IO(println(s))
 val pureStream = Stream(1, 2, 3)
 val printEverything: IO[Unit] =
   pureStream
-    .evalMap(putstrln) //Now we have a Stream[IO, Int]
+    .evalTap(putstrln) //Now we have a Stream[IO, Int]
     .compile
-    .drain //Discards all results, since "Unit" is useless
+    .drain //Discards all results
 
 //Prints 1, 2, 3 on separate lines
 printeverything.unsafeRunSync()
