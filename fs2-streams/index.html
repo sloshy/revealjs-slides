@@ -461,7 +461,7 @@ import fs2.concurrent.Queue
 
 def renderButton(count: Int, increase: IO[Unit]): IO[Unit]
 
-val fauxFlux for {
+val fauxFlux = for {
   q <- Queue.unbounded[IO, Int]
   es <- EventState[IO].initial[Int, Int](0)(_ + _)
   _ <- renderButton(0, q.enqueue(1))
