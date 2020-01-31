@@ -425,17 +425,20 @@ Stream(
           <p>Front-end and back-end apps can benefit from having state be event-driven</p>
           <p>Key in "Event Sourcing", Flux/Redux, etc.</p>
           <pre><code class="hljs scala" data-trim>
-def accumulateState(state: Int, next: Int) = state + next
+def buildState(state: Int, next: Int) = state + next
 
 val eventStream = Stream(1, 2, 3)
 
-//".fold" on a Stream gives you a stream of 1 element
-//".compile.fold" gives you the final accumulated value
-val finalState = eventStream.compile.fold(0)(accumulateState)
+//"fold" on a Stream gives you a stream of 1 element
+//"compile.fold" gives you the final accumulated value
+val finalState = eventStream.compile.fold(0)(buildState)
 //finalState == Some(6)
 
-//Want all intermediate states? Just use "scan"
-val allIntermediateStates = eventStream.scan(0)(accumulateState)
+//"scan" folds but also emits all intermediate states
+val intermediateStates = eventStream.scan(0)(buildState)
+  .compile
+  .toList
+//intermediateStates == List(0, 1, 3, 6)
           </code></pre>
         </section>
         <section>
@@ -457,24 +460,25 @@ val stateProgram: IO[(List[Int], Int)] = for {
         </section>
         <section>
           <p>Lets get reactive!</p>
-          <pre><code class="hljs scala" data-trim>
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1|3|5-13|14|">
 import fs2.concurrent.Queue
 
 def renderButton(count: Int, increase: IO[Unit]): IO[Unit]
 
-val fauxFlux = for {
+val fauxFlux: IO[Unit] = for {
   q <- Queue.unbounded[IO, Int]
-  es <- EventState[IO].initial[Int, Int](0)(_ + _)
-  _ <- renderButton(0, q.enqueue(1))
-  s1 = q.dequeue.through(es.hookup)
-  s2 = s.evalMap(i => renderButton(i, q.enqueue(1)))
-  _ <- s2.compile.drain
+  plusOne = q.enqueue1(1)
+  _ <- q.dequeue
+    .scan(0)(_ + _)
+    .evalTap(i => renderButton(i, plusOne))
+    .compile
+    .drain
 } yield ()
-
-fauxFlux.unsafeRunAsyncAndForget()
+fauxFlux.unsafeRunAsyncAndForget() //Needed for ScalaJS
                       </code></pre>
           <!-- TODO: put actual button here w/ scalajs -->
-          <p>Live demo --> (todo)</p>
+          <p>Live demo --> <span id="live-demo"></span>
+          </p>
         </section>
         <section>
           <h3>Streaming for Batches</h3>
@@ -484,7 +488,7 @@ fauxFlux.unsafeRunAsyncAndForget()
           <ul class="fragment">
             <li>Run 1 DB query? <span class="fragment it">Start processing immediately!</span></li>
             <li>Processing a single file? <span class="fragment it">Process it in parallel!</span></li>
-            <li>Doing literally anything else? <span class="fragment it">Try streaming it anyway!</span></li>
+            <li>Literally anything else? <span class="fragment it">Try streaming it anyway!</span></li>
           </ul>
           <p class="fragment">TL;DR: Streams are useful in finite and infinite use-cases equally</p>
         </section>
@@ -527,6 +531,8 @@ fauxFlux.unsafeRunAsyncAndForget()
       ]
     });
   </script>
+  <script src="js/fs2-reactive-button-jsdeps.min.js"></script>
+  <script src="js/fs2-reactive-button-opt.js"></script>
 </body>
 
 </html>
