@@ -313,8 +313,8 @@ val docPath =
   java.nio.file.Paths.get("/home/rpeters/Documents")
 val outFile = docPath.resolveSibling("out.txt")
 
-//Start w/ a stream of all files in my home directory
-fs2.io.file.walk(blocker, homePath).flatMap { path =>
+//Start w/ a stream of all files in the directory
+fs2.io.file.walk(blocker, docPath).flatMap { path =>
   //Read the file in, 512 bytes at a time
   fs2.io.file.readAll(path, blocker, 512)
     .through(fs2.text.utf8Decode) //Decode to String
