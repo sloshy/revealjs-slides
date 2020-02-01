@@ -36,9 +36,8 @@
       <section>
         <section>
           <h2>Subject of this talk:</h2>
-          <p>The year is 2020.</p>
-          <p class="fragment">A new form of "streams" are becoming a general-purpose programming primitive.</p>
-          <p class="fragment">Not all languages and libraries approach them equally.</p>
+          <p>A new form of "streams" have been becoming popular.</p>
+          <p class="fragment">Not all languages/libraries handle the concept equally.</p>
           <p class="fragment">That said...</p>
           <p class="fragment">Once you know one, to an extent, you know them all.</p>
         </section>
@@ -314,12 +313,12 @@ val userQuery: ConnectionIO[List[(String, Int)]] =
 val runQuery: IO[List[(String, Int)]] =
   userQuery.transact(xa)
 
-runQuery.flatMap(user => IO(println(user)))
+runQuery.flatMap(users => IO(users.foreach(println)))
           </code></pre>
         </section>
         <section>
           <p>Queries can also be streamed</p>
-          <pre><code class="hljs scala" data-trim data-line-numbers="|1|3-10|5|7|8|">
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1|3-10|5|6|7|8|">
 def sendBetaInvite(u: UserAccount): IO[Unit]
 
 sql"SELECT username, email FROM users WHERE banned = false"
@@ -391,7 +390,6 @@ Stream(
 ).parJoinUnbounded //Run all streams concurrently
   .compile
   .drain
-  .as(ExitCode.Success)
           </code></pre>
         </section>
         <section>
