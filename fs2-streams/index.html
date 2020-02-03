@@ -45,7 +45,7 @@
           <h2>Streaming with FS2</h2>
           <p>My streaming library of choice in Scala is FS2.</p>
           <p class="fragment">FS2 is inspired by - and also inspires - other libraries from other ecosystems.</p>
-          <p class="fragment">Most things here are applicable in almost any other language or streaming library.</p>
+          <p class="fragment">This presentation is applicable to almost any other language or streaming library.</p>
         </section>
       </section>
       <section>
@@ -54,10 +54,8 @@
         </section>
         <section data-background="img/Rx_Logo-512-512.png" data-background-size="50%" data-background-opacity="0.66">
           <h2>Back in 2016...</h2>
-          <ul style="list-style:none">
-            <li>I got in to Angular in JavaScript...</li>
-            <li>Which got me into RxJS</li>
-          </ul>
+          <p>I got in to Angular in JavaScript...</p>
+          <p>Which got me into RxJS</p>
         </section>
         <section>
           <h2>RxJS "Observables"</h2>
@@ -85,7 +83,7 @@
         <section>
           <h2>Takeaways:</h2>
           <ul>
-            <li>Streams "can be" async - but don't have to be</li>
+            <li>Streams represent <span style="font-style:italic">possibly</span> async data transformation</li>
             <li>Useful as a general-purpose primitive</li>
             <li>"Observables" == "Streams" in other libs</li>
             <p>(PS: Monix is like ReactiveX in Scala)</p>
@@ -154,9 +152,9 @@ printeverything.unsafeRunSync()
         </section>
         <section>
           <h3>Compiling Streams</h3>
-          <p>Streams in FS2 must be "compiled" to a value</p>
-          <p>"Pure" streams are executed immediately</p>
-          <p>Effectful streams must compile to an <span class="mono">F[_]</span> value</p>
+          <p>Streams in FS2 must be "compiled" to a pure value</p>
+          <p>"Pure" streams compile to the raw result <span class="mono">A</span></p>
+          <p>Effectful streams must compile to an <span class="mono">F[A]</span> value</p>
         </section>
         <section>
           <h3>Other Useful Compile Operators</h3>
@@ -194,20 +192,21 @@ printeverything.unsafeRunSync()
           <h3>RE: Akka Streams</h3>
           <ul>
             <li>Akka Streams is conceptually large</li>
-            <li>"Streams" are actually Sources/Sinks/Flows</li>
-            <li>...And those all have "shapes"</li>
-            <li>...And you compose them with a custom "graph DSL"</li>
-            <li>CAN be done functionally, but it's not actively encouraged</li>
-            <li>Engineered to mesh well with Actor-based programming, which is complex</li>
+            <li class="fragment">"Streams" are actually Sources/Sinks/Flows</li>
+            <li class="fragment">...And those all have "shapes"</li>
+            <li class="fragment">...And you compose them with a custom "graph DSL"</li>
+            <li class="fragment">CAN be done functionally, but it's not actively encouraged</li>
+            <li class="fragment">Engineered to mesh well with Actor-based programming, which is complex</li>
           </ul>
         </section>
         <section>
           <h3>Streaming "Cost/Benefits"</h3>
+          <p>My take:</p>
           <ul>
             <li>Streams are an general abstraction</li>
             <li>Once you know a concept - you can apply it anywhere</li>
             <li>Everybody benefits from knowing functional streaming</li>
-            <li>You already know it</li>
+            <li>You might as well already know it</li>
           </ul>
         </section>
         <section>
@@ -427,7 +426,7 @@ val stateProgram: IO[(List[Int], Int)] = for {
   currentState <- eventState.get //Gets the current state
 } yield allStates -> currentState
           </code></pre>
-          <p class="fragment">*Shill Alert: I wrote this one!</p>
+          <p class="fragment">*Bias Alert: I wrote this one!</p>
           <p class="fragment">Also includes a state cache & other helpful utils</p>
         </section>
         <section>
@@ -466,22 +465,39 @@ fauxFlux.unsafeRunAsyncAndForget() //Needed for ScalaJS
         </section>
       </section>
       <section>
-        <h3>Further Reading:</h3>
-        <p>Presentations:</p>
+        <section>
+          <h3>Further Reading:</h3>
+          <p>Presentations:</p>
+          <ul>
+            <li><a href="https://www.youtube.com/watch?v=30q6BkBv5MY">Functional Programming With Effects - Rob
+                Norris</a>
+            </li>
+            <li><a href="https://www.youtube.com/watch?v=YSN__0VEsaw">Declarative Control Flow with FS2 Stream - Fabio
+                Labella</a></li>
+            <li><a href="https://www.youtube.com/watch?v=urdtmx4h5LE">http4s: pure, typeful functional HTTP in Scala -
+                Ross Baker</a></li>
+          </ul>
+        </section>
+        <section>
+          <p>On the web:</p>
+          <ul>
+            <li><a href="https://fs2.io/">FS2 Website - https://fs2.io/</a></li>
+            <li><a href="https://gitter.im/functional-streams-for-scala/fs2">FS2 Gitter -
+                https://gitter.im/functional-streams-for-scala/fs2</a></li>
+            <li><a href="https://leanpub.com/pfp-scala">Practical FP in Scala - Gabriel Volpe</a></li>
+            <li><a href="https://monix.io/docs/3x/reactive/observable-comparisons.html">Comparisons with Other Solutions
+                -
+                Monix.io</a></li>
+          </ul>
+        </section>
+      </section>
+      <section>
+        <h2>Thank you!</h2>
         <ul>
-          <li><a href="https://www.youtube.com/watch?v=30q6BkBv5MY">Functional Programming With Effects - Rob Norris</a>
-          </li>
-          <li><a href="https://www.youtube.com/watch?v=YSN__0VEsaw">Declarative Control Flow with FS2 Stream - Fabio
-              Labella</a></li>
-          <li><a href="https://www.youtube.com/watch?v=urdtmx4h5LE">http4s: pure, typeful functional HTTP in Scala -
-              Ross Baker</a></li>
-        </ul>
-        <p>On the web:</p>
-        <ul>
-          <li><a href="https://fs2.io/">FS2 Website - https://fs2.io/</a></li>
-          <li><a href="https://gitter.im/functional-streams-for-scala/fs2">FS2 Gitter -
-              https://gitter.im/functional-streams-for-scala/fs2</a></li>
-          <li><a href="https://leanpub.com/pfp-scala">Practical FP in Scala - Gabriel Volpe</a></li>
+          <li>Github / Gitter: <a href="https://github.com/sloshy">Sloshy</a></li>
+          <li>Twitter: <a href="https://twitter.com/LiquidSloshalot">@LiquidSloshalot</a></li>
+          <li>Slides are available online: <a
+              href="https://slides.rpeters.dev/fs2-stream/">https://slides.rpeters.dev/fs2-stream/</a></li>
         </ul>
       </section>
     </div>
