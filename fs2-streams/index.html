@@ -10,10 +10,10 @@
   <link rel="stylesheet" href="css/custom.css">
   <link rel="stylesheet" href="css/reset.css">
   <link rel="stylesheet" href="css/reveal.css">
-  <link rel="stylesheet" href="css/theme/black.css">
+  <link rel="stylesheet" href="css/theme/black.css" id="theme">
 
   <!-- Theme used for syntax highlighting of code -->
-  <link rel="stylesheet" href="lib/css/monokai.css">
+  <link rel="stylesheet" href="lib/css/zenburn.css" id="code-theme">
 
   <!-- Printing and PDF exports -->
   <script>
@@ -31,7 +31,14 @@
       <section>
         <h1>Streams</h1>
         <h2>Your New Favorite Primitive</h2>
-        <h3>- Ryan Peters</h3>
+        <h3>By Ryan Peters</h3>
+        <p>Theme:
+          <a href="#"
+            onclick="document.getElementById('theme').setAttribute('href','css/theme/black.css'); return false;">Black
+            (default)</a> -
+          <a href="#" onclick="document.getElementById('theme').setAttribute('href','css/theme/solarized.css'); return
+            false;">Solarized</a>
+        </p>
       </section>
       <section>
         <section>
@@ -131,6 +138,14 @@ import fs2.{Pure, Stream}
 val pureStream: Stream[Pure, Int] = Stream(1, 2, 3)
 pureStream.map(_ - 1).compile.toList // List(0, 1, 2)
           </code></pre>
+          <p>Code Theme:
+            <a href="#/3/3" onclick="document.getElementById('code-theme').setAttribute('href','lib/css/monokai.css'); return
+            false;">Monokai (default)</a> -
+            <a href="#/3/3" onclick="document.getElementById('code-theme').setAttribute('href','lib/css/zenburn.css'); return
+            false;">Zenburn</a> -
+            <a href="#/3/3" onclick="document.getElementById('code-theme').setAttribute('href','lib/css/purebasic.css'); return
+            false;">Purebasic</a>
+          </p>
         </section>
         <section>
           <h3>Streaming side-effects</h3>
