@@ -418,7 +418,7 @@ val eventStream = Stream(1, 2, 3)
 //"fold" on a Stream gives you a stream of 1 element
 //"compile.fold" gives you the final accumulated value
 val finalState = eventStream.compile.fold(0)(buildState)
-//finalState == Some(6)
+//finalState == 6
 
 //"scan" folds but also emits all intermediate states
 val intermediateStates = eventStream.scan(0)(buildState)
