@@ -51,8 +51,8 @@
         <section>
           <h2>Streaming with FS2</h2>
           <p>My streaming library of choice in Scala is FS2.</p>
-          <p class="fragment">FS2 is inspired by - and also inspires - other libraries from other ecosystems.</p>
-          <p class="fragment">This presentation is applicable to almost any other language or streaming library.</p>
+          <p>FS2 is inspired by - and also inspires - other libraries from other ecosystems.</p>
+          <p>This presentation is applicable to almost any other language or streaming library.</p>
         </section>
       </section>
       <section>
@@ -73,12 +73,12 @@
               <th>Multiple</th>
             </tr>
             <tr>
-              <td style="font-weight:bold">Pull</td>
+              <td style="font-weight:bold">Pull / Sync</td>
               <td>Function</td>
               <td>Iterator</td>
             </tr>
             <tr>
-              <td style="font-weight:bold">Push</td>
+              <td style="font-weight:bold">Push / Async</td>
               <td>Promise</td>
               <td>Observable</td>
             </tr>
@@ -149,7 +149,7 @@ pureStream.map(_ - 1).compile.toList // List(0, 1, 2)
         </section>
         <section>
           <h3>Streaming side-effects</h3>
-          <pre><code class="hljs scala" data-trim data-line-numbers="|1-3|1-5|3,6-10|6-13|">
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1-3|1-5|3,6-11|3,6-14|">
 import cats.effect.IO
 
 def putstrln(s: String): IO[Unit] = IO(println(s))
@@ -157,6 +157,7 @@ def putstrln(s: String): IO[Unit] = IO(println(s))
 val pureStream = Stream(1, 2, 3)
 val printEverything: IO[Unit] =
   pureStream
+    .map(_.toString)
     .evalTap(putstrln) //Now we have a Stream[IO, Int]
     .compile
     .drain //Discards all results
@@ -170,6 +171,9 @@ printeverything.unsafeRunSync()
           <p>Streams in FS2 must be "compiled" to a pure value</p>
           <p>"Pure" streams compile to the raw result <span class="mono">A</span></p>
           <p>Effectful streams must compile to an <span class="mono">F[A]</span> value</p>
+          <p class="segment">Note: you can only call <span class="mono">.compile</span> if your <span
+              class="mono">F[_]</span> type can handle <span class="mono">Throwable</span> errors, or is
+            "pure"</p>
         </section>
         <section>
           <h3>Other Useful Compile Operators</h3>
@@ -211,7 +215,7 @@ printeverything.unsafeRunSync()
             <li class="fragment">...And those all have "shapes"</li>
             <li class="fragment">...And you compose them with a custom "graph DSL"</li>
             <li class="fragment">CAN be done functionally, but it's not actively encouraged</li>
-            <li class="fragment">Engineered to mesh well with Actor-based programming, which is complex</li>
+            <li class="fragment">Engineered to mesh well with Akka actors, which are complex</li>
           </ul>
         </section>
         <section>
@@ -227,8 +231,7 @@ printeverything.unsafeRunSync()
         <section>
           <h3>When are streams "necessary?"</h3>
           <p class="fragment">In software, "necessary" just means "easier/better"</p>
-          <p class="fragment">The real question is...</p>
-          <p class="fragment">...what are our alternatives?</p>
+          <p class="fragment">The real question is... what are our alternatives?</p>
         </section>
         <section>
           <h3>Stream "Alternatives"</h3>
@@ -263,7 +266,7 @@ printeverything.unsafeRunSync()
             <li class="fragment">Actors are pretty low-level (mailbox management, boilerplate, no backpressure)</li>
             <li class="fragment">This is a lot to think about sometimes</li>
             <li class="fragment">Actors are a great concept - just not a great default tool</li>
-            <li class="fragment">Messaging, state, etc. are even easier w/ streams</li>
+            <li class="fragment">Messaging, state, etc. are even easier w/ streams (write your own "actors")</li>
           </ul>
         </section>
         <section>
@@ -384,10 +387,43 @@ def runScript(blocker: Blocker, client: Client[F], cc: ConnectionConfig)(implici
           </code></pre>
           <p class="fragment">Also supports stderr, stdin, joining</p>
         </section>
+        <section>
+          <h3>Honorable Mentions</h3>
+          <ul>
+            <li><a href="https://github.com/fd4s/fs2-kafka">fd4s/fs2-kafka</a> - Pure streaming Kafka client wrapper
+              library</li>
+            <li><a href="https://github.com/neotypes/neotypes">neotypes/neotypes</a> - Neo4j Database Driver w/ stream
+              support</li>
+            <li><a href="https://github.com/profunktor/redis4cats">profunktor/redis4cats</a> - Streaming Redis client
+              including pubsub/stream support</li>
+            <li><a href="https://github.com/krasserm/streamz">krasserm/streamz</a> - Convert Akka Streams to FS2, & DSL
+              for Apache Camel</li>
+            <li><a href="https://github.com/SystemFw/upperbound">SystemFw/upperbound</a> - Pure functional rate limiting
+              for FS2</li>
+          </ul>
+        </section>
       </section>
       <section>
         <section>
           <h2>Streaming Patterns</h2>
+        </section>
+        <section>
+          <h3>Streams are Resources, Scopes</h3>
+          <p>Lift <span class="mono">cats.effect.Resource</span> to <span class="mono">Stream</span></p>
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1-4|1-6|">
+import cats.effect.{Blocker, IO, Resource}
+
+val newBlocker: Resource[IO, Blocker] = Blocker[IO]
+val blockerStream = Stream.resource(newBlocker)
+val fileNameStream: Stream[IO, Path] = ???
+def search(blocker: Blocker, file: Path): IO[String] = ???
+
+blockerStream.flatMap { blocker =>
+  fileNameStream.evalMap { name => 
+    searchForTextInFile(blocker, name)
+  }
+} //Blocker resource is closed once your stream is over
+          </code></pre>
         </section>
         <section>
           <p>Run your whole program as concurrent streams</p>
@@ -429,20 +465,22 @@ val intermediateStates = eventStream.scan(0)(buildState)
         </section>
         <section>
           <p>For some extra event-sourcing utils, try FS2-ES*</p>
-          <pre><code class="hljs scala" data-trim>
+          <pre><code class="hljs scala" data-trim data-line-numbers="|1-4|1-8|1-9|">
 import dev.rpeters.fs2.es._
 
 val stateProgram: IO[(List[Int], Int)] = for {
   eventState <- EventState[IO].initial[Int, Int](0)(_ + _)
   states <- Stream(1, 2, 3)
-    .through(eventState.hookup) //Stream of resulting states
+    .through(eventState.hookup) //Stream of result states
     .compile
     .toList
   currentState <- eventState.get //Gets the current state
 } yield allStates -> currentState
+
+stateProgram.unsafeRunSync() //List(1, 3, 6) -> 6
           </code></pre>
+          <p>Also includes a state cache & other helpful utils</p>
           <p class="fragment">*Bias Alert: I wrote this one!</p>
-          <p class="fragment">Also includes a state cache & other helpful utils</p>
         </section>
         <section>
           <p>Lets get reactive!</p>
@@ -468,15 +506,16 @@ fauxFlux.unsafeRunAsyncAndForget() //Needed for ScalaJS
         </section>
         <section>
           <h3>Streaming for Batches</h3>
-          <p>Common misconception:</p>
-          <p>"Streaming" only makes sense for "streaming apps"</p>
-          <p class="fragment">You'd only be making things harder on yourself!</p>
-          <ul class="fragment">
-            <li>Run 1 DB query? <span class="fragment it">Start processing immediately!</span></li>
-            <li>Processing a single file? <span class="fragment it">Process it in parallel!</span></li>
-            <li>Literally anything else? <span class="fragment it">Try streaming it anyway!</span></li>
+          <p>Misconception: "Streaming" only makes sense for "streaming apps"</p>
+          <p>You'd only be making things harder on yourself!</p>
+          <ul>
+            <li>Streaming whole files? <span class="fragment it">Swap between stream & batch!</span></li>
+            <li>Only doing a "single thing?" <span class="fragment it">Handle retries, split it up, & add
+                paralleilsm!</span></li>
+            <li>Can fit everything into memory anyway? <span class="fragment it">Start processing data
+                immediately!</span>
+            </li>
           </ul>
-          <p class="fragment">TL;DR: Streams are useful in finite and infinite use-cases equally</p>
         </section>
       </section>
       <section>
