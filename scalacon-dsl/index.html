@@ -355,15 +355,15 @@ import fs2.io.files.{Files, Path}
 
 trait MyDSL[F[_]]:
   def print(s: String): F[Unit]
-	def read: F[String]
+  def read: F[String]
+  
+trait MyExtendedDSL[F[_]] extends MyDSL:
   def readFromFile(path: Path): F[String]
-
-given [F[_]: Files: Console] MyDSL[F] with
+  def writeToFile(s: String, path: Path): F[Unit]
+  
+given [F[_]: Files: Console] MyExtendedDSL[F] with
   def print(s: String) = Console[F].println(s)
-	def read = Console[F].readLine
-	def readFromFile(path: Path) = 
-		//Uses a streaming-data DSL from FS2 (fs2.Stream)
-		Files[F].readFromFile(path).through(fs2.text.utf8.decode).compile.string
+  //And so on...
 				</code></pre>
 			</section>
 			<section>
