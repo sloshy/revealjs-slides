@@ -358,7 +358,7 @@ trait MyDSL[F[_]]:
 	def read: F[String]
   def readFromFile(path: Path): F[String]
 
-given [F[_]: Sync: Console] MyDSL[F] with
+given [F[_]: Files: Console] MyDSL[F] with
   def print(s: String) = Console[F].println(s)
 	def read = Console[F].readLine
 	def readFromFile(path: Path) = 
