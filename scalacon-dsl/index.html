@@ -1,0 +1,471 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<title>reveal.js</title>
+
+	<link rel="stylesheet" href="dist/reset.css">
+	<link rel="stylesheet" href="dist/reveal.css">
+	<link rel="stylesheet" href="dist/theme/black.css">
+	<link rel="stylesheet" href="dist/custom.css">
+
+	<!-- Theme used for syntax highlighted code -->
+	<link rel="stylesheet" href="plugin/highlight/monokai.css">
+</head>
+
+<body>
+	<div class="reveal">
+		<div class="slides">
+			<section>
+				<h2>Your Program Is a Language</h2>
+				<h4>By Ryan Peters</h4>
+				<h6>@ 47 Degrees</h6>
+			</section>
+			<section>
+				<h3>About Me</h3>
+				<ul>
+					<li>Senior Scala Engineer at 47 Degrees</li>
+					<li>Writing Scala since 2017, professionally since 2018</li>
+					<li>Not exactly an academic - BS in CompSci, minor in Mathematics</li>
+				</ul>
+			</section>
+			<section>
+				<h2>Some Notes</h2>
+				<ul>
+					<li>Code is in Scala 3</li>
+					<li>Any demoed code also has a Scala 2 version</li>
+					<li>Talk is intermediate level (not explaining everything)</li>
+					<li>Talk was pre-recorded</li>
+				</ul>
+			</section>
+			<section>
+				<h4>Part 1</h4>
+				<h2>What We Talk About When We Talk About DSLs</h2>
+			</section>
+			<section>
+				<ul>
+					<li>Domain-Specific - Relating to a particular field or problem</li>
+					<li>Language - A set of rules and expressions for communication</li>
+				</ul>
+			</section>
+			<section>
+				<img src="dist/chart.png">
+			</section>
+			<section>
+				<h3 class="i">"Increase balance of account X by 500 cents"</h3>
+				<p>Describes <span class="i">what</span> you want to do, less-so <span class="i">how</span></p>
+			</section>
+			<section>
+				<div class="fc">
+					<div class="fi">
+						<h3>Low Coupling</h3>
+						<p>Modules should not interdepend on each other</p>
+					</div>
+					<div class="fi">
+						<h3>High Cohesion</h3>
+						<p>Modules should contain closely-related code </p>
+					</div>
+				</div>
+			</section>
+			<section>
+				<p>DSLs are often, not always, interpreted or "compiled". Henceforth we'll use "interpreter/compiler"
+					interchangeably.</p>
+				<p class="fragment">(Remember when I said those were the same?)</p>
+				<p class="fragment">Interpretation means indirection. Indirection means writing more generic, abstract code that
+					can be repurposed.</p>
+				<p class="fragment">This is the essence of what makes a "good DSL"</p>
+			</section>
+			<section>
+				<h2>POP QUIZ</h2>
+				<p>What is the difference between normal library code and a DSL?</p>
+				<p class="fragment">(trick question; there isn't one)</p>
+			</section>
+			<section>
+				<p>A good DSL is <span class="i">anything</span> that is used to model your business requirements directly.</p>
+				<p class="fragment">DSLs themselves can have a high/low hierarchy as well.</p>
+			</section>
+			<section>
+				<p>Example from http4s</p>
+				<pre><code class="scala" data-trim>GET -> Root / "user" / IntValue(userId)</code></pre>
+				<p>Matches a GET request at path "/user/(userId)" where userId is an Int</p>
+			</section>
+			<section>
+				<pre><code class="scala" data-trim>
+val in = Source(1 to 10)
+val out = Sink.ignore
+
+val bcast = builder.add(Broadcast[Int](2))
+val merge = builder.add(Merge[Int](2))
+
+val f1, f2, f3, f4 = Flow[Int].map(_ + 10)
+
+in ~> f1 ~> bcast ~> f2 ~> merge ~> f3 ~> out
+bcast ~> f4 ~> merge
+ClosedShape
+				</code></pre>
+				<p>
+					From <a href="https://doc.akka.io/docs/akka/current/stream/stream-graphs.html#constructing-graphs">Akka
+						Streams documentation</a>
+				</p>
+			</section>
+			<section>
+				<pre><code class="scala" data-trim>
+body(
+  h2("My Header"),
+  p("Paragraph of Text"),
+	ul(
+		li("List item 1"),
+		li("List item 2"),
+	)
+)
+				</code></pre>
+				<p><a href="https://github.com/com-lihaoyi/scalatags">Scalatags</a> HTML generation</p>
+			</section>
+			<section>
+				<h3>Type Classes might as well be DSLs</h3>
+				<pre><code class="scala" data-trim>
+trait Monad[F[_]]:
+	//Creates an F[B] based on the value of F[A]
+  def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B]
+				</code></pre>
+				<p class="fragment">Monad is like a "DSL for dependent computations"</p>
+			</section>
+			<section>
+				<p>DSLs and Type Classes encode "capability"</p>
+				<p>"What operations are legal? What concepts can I represent?"</p>
+				<p>It makes sense that a lot of DSLs are written as type classes (tagless final style)</p>
+			</section>
+			<section>
+				<h4>Part 2</h4>
+				<h2>Styles of DSLs</h2>
+			</section>
+			<section>
+				<div class="fc">
+					<div class="fi">
+						<h4>Embedded</h4>
+						<ul>
+							<li>Using a "host language"</li>
+							<li>Syntax, capabilities limited</li>
+							<li>Very little work</li>
+						</ul>
+					</div>
+					<div class="fi">
+						<h4>External / Parsed (text)</h4>
+						<ul>
+							<li>Can use any syntax</li>
+							<li>More portable</li>
+							<li>More work</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+			<section>
+				<h2>Embedded == Easy programming languages</h2>
+				<pre><code class="scala" data-trim>
+trait MyDSL[F[_]]:
+  def doNext[B](first: F[A], next: F[B]): F[B]
+	def pure[A](value: A): F[A]
+
+extension [F[_]: MyDSL, A] (fa: F[A])
+	infix def *>[B](fb: F[B]) = doNext(fa, fb)
+
+def myProgram[F[_]](using dsl: MyDSL[F]) =
+  dsl.pure("Hello, ") *> dsl.pure("world!")
+				</code></pre>
+			</section>
+			<section>
+				<h3>Types of embedded</h3>
+				<ul>
+					<li>Concrete(-ish) code - Fancy syntax over regular Scala</li>
+					<li>Macros & code generation - Useful when going beyond traditional code</li>
+					<li>Data structures / Free - Representing intent as traversable data to be "interpreted"</li>
+					<li>"Tagless Final" - Code written in terms of an "interpreter effect", highly flexible</li>
+				</ul>
+			</section>
+			<section>
+				<h3>Syntax in Scala 3</h3>
+				<pre><code class="scala" data-trim style="max-height: 600px">
+opaque type Natural = Int
+
+object Natural:
+  def fromAbsOf(i: Int): Natural = i.abs
+				
+opaque type HighScore = Int
+
+object HighScore:
+  def fromNat(n: Natural): HighScore = n
+
+extension (hs: HighScore)
+  def >(that: HighScore): Boolean = hs > that
+	def <(that: HighScore): Boolean = hs < that
+	def +(that: HighScore): HighScore = hs + that
+	def +(that: Natural): HighScore = hs + that
+	infix def max(that: HighScore): HighScore = hs.max(that)
+				</code></pre>
+			</section>
+			<section>
+				<h3>Data Structure DSL</h3>
+				<pre><code class="scala" data-trim>
+enum Transformation:
+  case ToLowerCase
+
+enum CustomDSL[A]:
+  case Print(s: String) extends CustomDSL[Unit]
+	case DoNext[A](a: CustomDSL[Any], next: CustomDSL[A]) extends CustomDSL[A]
+	case ReadInput extends CustomDSL[String]
+	case Transform(a: CustomDSL[String], t: Transformation) extends CustomDSL[String]
+
+def compiler(program: CustomDSL[A]): cats.Id[A] = ???
+compiler(
+	DoNext(Print("Enter your name"), Transform(ReadInput, Transformation.ToLowerCase))
+)
+				</code></pre>
+			</section>
+			<section>
+				<h3>Free DSL</h3>
+				<p>Based on previous code</p>
+				<pre><code class="scala" data-trim>
+import cats.free.Free
+
+type DSLProgram[A] = Free[CustomDSL, A]
+
+def print(s: String): DSLProgram[Unit] = 
+  Free.liftF(CustomDSL.Print(s)) //And so on
+
+//Don't need DoNext
+val freeProgram = print("Hello") >> print("World")
+val result = freeProgram.foldMap(compiler)
+				</code></pre>
+				<p>Free gives us a Monad "for free" that allows us to sequence our ops.</p>
+				<p class="fragment">Also see Free Applicative for independent computations.</p>
+			</section>
+			<section>
+				<h3>Tagless Final DSL</h3>
+				<pre><code class="scala" data-trim>
+trait CustomDSL[F[_]]:
+  def print(s: String): F[Unit]
+	def readInput: F[String]
+	def transform(s: String, t: Transformation)
+
+given CustomDSL[cats.Id] with //Our compiler
+  def print(s: String) = println(s) //And so on
+
+def program[F[_]: cats.Applicative](using dsl: CustomDSL[F]) =
+	import dsl._
+  print("Enter your name") *> 
+	  readInput.map(transform(_, Transformation.ToLowerCase))
+
+val compiledProgram: String = program[Id] //Id == no effect
+				</code></pre>
+				<p>A tagless final DSL is often called an "algebra"</p>
+			</section>
+			<section>
+				<h3>Data/Free VS Tagless</h3>
+				<div class="fc">
+					<div class="fi fragment">
+						<h4>Data/Free</h4>
+						<ul>
+							<li>Pretty easy to teach</li>
+							<li>More boilerplate to lift to Free</li>
+							<li>Runs into "expression problem"</li>
+						</ul>
+					</div>
+					<div class="fi fragment">
+						<h4>Tagless</h4>
+						<ul>
+							<li>Can use arbitrary effects</li>
+							<li>Less indirection / lower overhead</li>
+							<li>Does not have "expression problem"</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+			<section>
+				<h3>Other reasons I like Tagless Final</h3>
+				<ul>
+					<li>Very, very common in Scala</li>
+					<li>Easy to extend in multiple directions </li>
+					<li>The most lightweight</li>
+					<li>More familiar to OOP programmers</li>
+					<li>Can do everything<sup>*</sup> others can do + more</li>
+					<li>You can combine multiple DSLs in a program</li>
+				</ul>
+				<p><sup>*</sup>Except macros, technically</p>
+			</section>
+			<section>
+				<h3>The Expression Problem</h3>
+				<p>A common<sup>*</sup> issue when writing any DSL is you lose some freedom of expression.</p>
+				<p>Ideally we want DSLs that are easily extended and without harsh compromises.</p>
+				<p><sup>*</sup>(this actually came up while I was writing examples)</p>
+			</section>
+			<section>
+				<h4>Using an ADT</h4>
+				<pre><code class="scala" data-trim>
+sealed trait StringExpr
+
+enum Expr:
+  case Literal(s: String) extends Expr with StringExpr
+	case Print(lit: StringExpr) extends Expr
+	case Read extends Expr with StringExpr
+				</code></pre>
+				<p>You can't add new operations to this ADT DSL without changing it</p>
+			</section>
+			<section>
+				<pre><code class="scala" data-trim>
+def compilerOne(e: Expr): Unit
+def compilerTwo(e: Expr): IO[Unit]
+				</code></pre>
+				<p>However, it's very easy to add new compilers with very different implementations</p>
+			</section>
+			<section>
+				<h4>Using Traits</h4>
+				<pre><code class="scala" data-trim>
+trait MyDSL:
+  def print(s: String): Unit
+	def read: String
+
+trait MyLargerDSL extends MyDSL:
+  def readFromFile(path: Path): Try[String]
+	def writeToFile(s: String, path: Path): Try[Unit]
+				</code></pre>
+				<p>You can add new operations by extending the previous trait</p>
+			</section>
+			<section>
+				<pre><code class="scala" data-trim>
+class MyDSLImpl() extends MyDSL:
+  def print(s: String): Unit = println(s)
+	def read: String = Console.in.readLine()
+
+class MyOtherDSLImpl() extends MyDSL:
+	//Types don't give us a lot of options for interpreting the DSL?
+	//i.e. can't use Try, Future, IO
+	def print(s: String): Unit = ??? 
+	def read: String = ???
+				</code></pre>
+				<p>...But it's a lot more restrictive in terms of how you actually implement things</p>
+			</section>
+			<section>
+				<h3>Why not both?</h3>
+				<pre><code class="scala" data-trim>
+import cats.effect.std.Console
+import fs2.io.files.{Files, Path}
+
+trait MyDSL[F[_]]:
+  def print(s: String): F[Unit]
+	def read: F[String]
+  def readFromFile(path: Path): F[String]
+
+given [F[_]: Sync: Console] MyDSL[F] with
+  def print(s: String) = Console[F].println(s)
+	def read = Console[F].readLine
+	def readFromFile(path: Path) = 
+		//Uses a streaming-data DSL from FS2 (fs2.Stream)
+		Files[F].readFromFile(path).through(fs2.text.utf8.decode).compile.string
+				</code></pre>
+			</section>
+			<section>
+				<h4>Part 3</h4>
+				<h2>Code Examples</h2>
+				<p>On GitHub @ <a href="https://www.github.com/sloshy/scalacon-dsl-examples">sloshy/scalacon-dsl-examples</a>
+				</p>
+			</section>
+			<section>
+				<h4>Part 4</h4>
+				<h2>DSL Design Technique</h2>
+			</section>
+			<section>
+				<p>The last thing you want is a solution in search of a problem</p>
+				<p>Instead of building up from a lower level base, build down from your top-level requirements</p>
+			</section>
+			<section>
+				<p><span class="i">"A financial account has a monetary balance. The balance is affected at end-of-day. The
+						balance consists of US Cents. At end-of-day, the balance is changed in response to particular
+						events."</span></p>
+			</section>
+			<section>
+				<h3>The wrong way</h4>
+					<ol>
+						<li>Deciding on an overall system architecture</li>
+						<li>Looking at implementation details for your account database</li>
+						<li>Building anything with premature optimization</li>
+					</ol>
+			</section>
+			<section>
+				<h3>The right way</h4>
+					<ol>
+						<li>Creating types for every concept (money, account, event)</li>
+						<li>Modeling the relationships in the requirements as a DSL</li>
+						<li>Letting the compiler tell you it all works before you implement an interpreter/compiler</li>
+					</ol>
+			</section>
+			<section>
+				<pre><code class="scala" data-trim style="max-height: 600px; width: 975px">
+opaque type Cents = Int
+opaque type BasisPoint = Int //1 == 0.01%
+
+enum AccountEvent:
+  case IncreaseBalanceBy(amt: Cents)
+	case IncreaseInterestRateBy(amt: BasisPoint)
+
+trait AccountHandler[F[_]]:
+  def modBalance(f: Cents => Cents): F[Unit]
+	def modInterestRate(f: BasisPoint => BasisPoint): F[Unit]
+
+def eodHandler[F[_]](ev: AccountEvent, handler: AccountHandler[F]) =
+  ev match
+  case IncreaseBalanceBy(amt) => handler.modBalance(_ + amt)
+	case IncreaseInterestRateBy(amt) => handler.modInterestRate(_ + amt)
+				</code></pre>
+			</section>
+			<section>
+				<h3>Takeaways</h3>
+				<ul>
+					<li>DSLs are any code that makes business requirements easier to express</li>
+					<li>External DSLs are better for portability between languages (e.g. HTML, SQL)</li>
+					<li>Embedded DSLs are typically best done in tagless final style (least trade-offs)</li>
+					<li>Write your code from the top-down, starting with requirements first</li>
+				</ul>
+			</section>
+			<section>
+				<h3>Other Resources</h3>
+				<ul>
+					<li><a href="https://underscore.io/blog/posts/2017/06/02/uniting-church-and-state.html">Uniting Church and
+							State: FP and OO Together</a> by Noel Welsh</li>
+					<li><a href="https://www.youtube.com/watch?v=30q6BkBv5MY">Functional Programming with Effects</a> by Rob
+						Norris</li>
+					<li><a href="https://www.youtube.com/watch?v=wi-Pa0K1waI">From Zero to Three - Building a User Friendly DSL
+							with Scala 3</a> by Jakob Odersky</li>
+				</ul>
+			</section>
+			<section>
+				<h1>Thank you!</h1>
+				<ul>
+					<li>On Twitter <a href="https://twitter.com/LiquidSloshalot">@LiquidSloshalot</a></li>
+					<li>On Github as <a href="https://www.github.com/sloshy">Sloshy</a></li>
+					<li>Slides available on <a href="https://slides.rpeters.dev/scalacon-dsl/">slides.rpeters.dev</a></li>
+				</ul>
+			</section>
+		</div>
+	</div>
+
+	<script src="dist/reveal.js"></script>
+	<script src="plugin/notes/notes.js"></script>
+	<script src="plugin/markdown/markdown.js"></script>
+	<script src="plugin/highlight/highlight.js"></script>
+	<script>
+		// More info about initialization & config:
+		// - https://revealjs.com/initialization/
+		// - https://revealjs.com/config/
+		Reveal.initialize({
+			hash: true,
+
+			// Learn about plugins: https://revealjs.com/plugins/
+			plugins: [RevealMarkdown, RevealHighlight, RevealNotes]
+		});
+	</script>
+</body>
+
+</html>

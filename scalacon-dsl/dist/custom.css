@@ -1,0 +1,13 @@
+.i {
+  font-style: italic;
+}
+
+.fc {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-evenly;
+}
+
+.fi {
+  flex-grow: 1;
+}
