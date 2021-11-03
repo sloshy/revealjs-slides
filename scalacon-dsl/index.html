@@ -163,29 +163,6 @@ trait Monad[F[_]]:
 				</div>
 			</section>
 			<section>
-				<h2>Embedded == Easy programming languages</h2>
-				<pre><code class="scala" data-trim>
-trait MyDSL[F[_]]:
-  def doNext[B](first: F[A], next: F[B]): F[B]
-	def pure[A](value: A): F[A]
-
-extension [F[_]: MyDSL, A] (fa: F[A])
-	infix def *>[B](fb: F[B]) = doNext(fa, fb)
-
-def myProgram[F[_]](using dsl: MyDSL[F]) =
-  dsl.pure("Hello, ") *> dsl.pure("world!")
-				</code></pre>
-			</section>
-			<section>
-				<h3>Types of embedded</h3>
-				<ul>
-					<li>Concrete(-ish) code - Fancy syntax over regular Scala</li>
-					<li>Macros & code generation - Useful when going beyond traditional code</li>
-					<li>Data structures / Free - Representing intent as traversable data to be "interpreted"</li>
-					<li>"Tagless Final" - Code written in terms of an "interpreter effect", highly flexible</li>
-				</ul>
-			</section>
-			<section>
 				<h3>Syntax in Scala 3</h3>
 				<pre><code class="scala" data-trim style="max-height: 600px">
 opaque type Natural = Int
