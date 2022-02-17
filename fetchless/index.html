@@ -1,0 +1,359 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<title>reveal.js</title>
+
+	<link rel="stylesheet" href="dist/reset.css">
+	<link rel="stylesheet" href="dist/reveal.css">
+	<link rel="stylesheet" href="dist/theme/black.css">
+
+	<!-- Theme used for syntax highlighted code -->
+	<link rel="stylesheet" href="plugin/highlight/monokai.css">
+</head>
+
+<body>
+	<div class="reveal">
+		<div class="slides">
+			<section>
+				<h2>From Fetch to Fetchless</h2>
+				<h4>An exercise in trade-offs in encoding DSLs</h4>
+				<p>Ryan Peters @ 47 Degrees</p>
+			</section>
+			<section>
+				<p>Builds on top of my ScalaCon 2021 Talk:</p>
+				<p><a href="https://www.youtube.com/watch?v=fYDfAKfnfPc">Your Program Is A Language</a></p>
+			</section>
+			<section>
+				<h3>What is <a
+						href="https://www.47deg.com/blog/fetch-scala-library/#introducing-fetch-a-new-scala-library-for-simple-and-efficient-data-access-0">Fetch</a>?
+				</h3>
+				<ul>
+					<li>Library for optimizing requests for data</li>
+					<li>Automatically batches independent requests</li>
+					<li>Deduplicates requests made in sequence</li>
+					<li>Ensures requests run in parallel whenever possible</li>
+				</ul>
+			</section>
+			<section>
+				<pre><code class="hljs scala" data-trim>
+//Represents a K/V store where strings have an integer ID
+val dataSource: DataSource[IO, Int, String] = ???
+
+def fetch(i: Int) = Fetch.optional(i, dataSource)
+
+//Fetches both 1 and 2, at once
+//Deduplicates the second request for 1
+val dedupedFetch = (fetch(1), fetch(2), fetch(1)).tupled
+
+Fetch.run(dedupedFetch).map {
+	case (Some(first), Some(second), Some(firstAgain)) => ???
+	//And so on...
+}
+				</code></pre>
+			</section>
+			<section>
+				<h3>Fetch == A DSL?</h3>
+				<p>DSLs are just high-level code</p>
+				<p>DSLs can be written in multiple styles</p>
+			</section>
+			<section>
+				<p>Fetch is written in a "free" style, as a data structure</p>
+				<pre><code class="hljs scala" data-trim>
+//Defines all terms in our language
+sealed trait MyLanguage
+
+//Concepts, operations, etc are just data
+final case class MyIntOp(i: Int) extends MyLanguage
+final case class MyStrOp(s: String) extends MyLanguage
+
+//We need a way to combine our ops into a program
+//List is a simple way to imply a sequence or ordering
+val myProgram = List(MyIntOp(42), MyStrOp("Hello world!"))
+
+//Programs as data structure must be interpreted explicitly
+def interpret(ops: List[MyLanguage]): Unit
+				</code></pre>
+				<p>List is a "free monoid" - giving us the ability to combine ops "for free"</p>
+			</section>
+			<section>
+				<p>Other "free" variants:</p>
+				<ul>
+					<li>Free Monad - lets us describe dependent computations (<code>flatMap</code>)</li>
+					<li>Free Applicative - lets us describe independent computations (<code>product</code>, etc)</li>
+				</ul>
+				<p>You can find these in Cats and other libraries</p>
+			</section>
+			<section>
+				<h2>Note on Applicative v Monad</h2>
+				<p>Monads MUST be dependent, Applicatives can't</p>
+				<pre><code class="hljs scala" data-trim>
+//Must work as a strict, dependent sequence
+List(Right(1), Left(1), Right(1))
+
+//Applicatives are independent,
+//so there is room for optimizing
+List(Valid(1), Invalid(1), Valid(1))
+				</code></pre>
+			</section>
+			<section>
+				<h3>How this affected Fetch</h3>
+				<p>Cats 2.7.0 changed an implementation detail of the type classes <code>Fetch</code> used.</p>
+				<p>Fetch is unlawful - it wants to be Monadic without the guarantee of sequencing</p>
+			</section>
+			<section>
+				<p>Fetch 3 won't guarantee automatic sequence batching</p>
+				<p>Fetch 3.1.0 brings it back w/ a targeted override</p>
+			</section>
+			<section>
+				<h3>A New Fetch</h3>
+				<ul>
+					<li>Removing auto-batching makes it a different library</li>
+					<li>Fetch has various "problems" stemming from its design style</li>
+					<li>It's a fun proof-of-concept exercise! :)</li>
+				</ul>
+			</section>
+			<section>
+				<h2>Fetch "Problems"</h2>
+			</section>
+			<section>
+				<h3>DataSource is heavy</h3>
+				<pre><code class="hljs scala" data-trim>
+trait DataSource[F[_], I, A] {
+	def data: Data[I, A] //Used to optimize access
+
+	//Needs to capture the Concurrent instance
+	implicit def CF: Concurrent[F]
+
+	def fetch(id: I): F[Option[A]]
+	def batch(ids: NonEmptyList[I]): F[Map[I, A]]
+	
+	//Smells like implementation details
+	def maxBatchSize: Option[Int] = None
+	def batchExecution: BatchExecution = InParallel
+}
+				</code></pre>
+			</section>
+			<section>
+				<h3>Running requires many capabilities</h3>
+				<pre><code class="hljs scala" data-trim>
+//Slightly simplified from the source code
+//You need `Concurrent` and `Clock` wherever you run a fetch
+def run[F[_]: Concurrent: Clock, A](fa: Fetch[F, A])
+				</code></pre>
+			</section>
+			<section>
+				<h3>Logging, etc must be baked-in</h3>
+				<p>Functions such as <code>runLog</code> need to be hard-coded in, and you can't write your own</p>
+				<p>See: <a href="https://github.com/47degrees/fetch/issues/429">GitHub Issue #429</a> where a user wants to
+					define a timeout on a single <code>Fetch</code>, which is not possible</p>
+			</section>
+			<section>
+				<h3>Converting Free -> Tagless</h3>
+				<ul>
+					<li>Programs are not deferred, but interpreted immediately</li>
+					<li>Data becomes syntax - i.e. MyIntOp becomes <code>[int].myOp</code></li>
+					<li>You can capture capability away from your program</li>
+				</ul>
+			</section>
+			<section>
+				<h3>A Basic Fetch DSL</h3>
+				<pre><code class="hljs scala" data-trim>
+//Replaces DataSource
+trait Fetch[F[_], I, A] {
+	val id: String //Naive identifier per-instance
+	def single(i: I): F[Option[A]]
+	def many(is: Set[I]): F[Map[I, A]]
+}
+
+val intFetch: Fetch[IO, Int, Int] =
+  Fetch.echo[IO, Int, Int]("intFetch")
+
+//Can support syntax
+4.fetch(intFetch) >> 5.fetch(intFetch) //Manual sequencing
+
+(4, 5, 6).fetchTupled(intFetch) //Applicative-like syntax
+				</code></pre>
+			</section>
+			<section>
+				<p>Pros: Very little code, syntax makes intent apparent</p>
+				<p>Cons: No concept of deduping, auto-batching</p>
+			</section>
+			<section>
+				<h3>Adding deduping</h3>
+				<pre><code class="hljs scala" data-trim>
+//We need to cache results between fetches
+type CacheMap = Map[(Any, String), Option[Any]]
+
+//An already-ran fetch, can be used for linear deduping
+final case class DedupedFetch[F[_], A](
+	unsafeCache: CacheMap, last: A
+)
+
+//Supported with syntax, not as nice
+intFetch.fetchDedupe(5)
+  .alsoFetch(intFetch)(5)
+	.alsoFetchAll(intFetch)(Set(4, 5, 6))
+
+(4, 5, 6).fetchTupledDedupe(intFetch)
+				</code></pre>
+			</section>
+			<section>
+				<p>Pros: Now we can dedupe fetches in a strict linear order!</p>
+				<p style="text-align: left;">Cons:</p>
+				<ul>
+					<li>Need even more syntax since all results are in F</li>
+					<li>You can't compose fetches in any order - MUST be linear</li>
+					<li>Still does not support implicit batching</li>
+				</ul>
+			</section>
+			<section>
+				<h3>Composing fetch requests</h3>
+				<pre><code class="hljs scala" data-trim>
+//Lets defer running a fetch, make it lazy!
+final case class LazyFetch[F[_], A](
+	k: Kleisli[F, CacheMap, DedupedFetch[F, A]]
+)
+
+//Much nicer syntax again
+5.fetchLazy(intFetch) >> 6.fetchLazy(intFetch)
+
+//Can compose fetches in any direction
+val oneOrder = fetch1 >> fetch2 >> fetch3
+val otherOrder = fetch2 >> fetch3 >> fetch1
+
+//Run any time
+otherOrder.run //F[DedupedFetch[F, A]]
+				</code></pre>
+			</section>
+			<section>
+				<p>We can fetch, dedupe, even interleve effects...</p>
+				<p>...But we still can't auto-batch!</p>
+			</section>
+			<section>
+				<h3>A little closer...</h3>
+				<pre><code class="hljs scala" data-trim>
+final case class LazyFetch[F[_]: FlatMap, A](
+	k: Kleisli[F, CacheMap, DedupedFetch[F, A]]
+)
+
+//Kinda looks like...
+
+final case class OptionT[F[_], A](value: F[Option[A]])
+				</code></pre>
+				<p>We've (unintentionally) made a transformer!</p>
+			</section>
+			<section>
+				<p>Lets fix auto-batching:</p>
+				<pre><code class="hljs scala" data-trim>
+//How to get a batch
+type LazyBatchGetter[F[_]] = 
+  (Set[Any], CacheMap) => F[DedupedFetch[F, Map[Any, Any]]]
+
+//Fetch ID -> (IDs -> Getters)
+type LazyBatchReqs[F[_]] = 
+  Map[String, (Set[Any], LazyBatchGetter[F])]
+
+final case class LazyBatch[F[_]: Applicative, A](
+	reqs: LazyBatchReqs[F],
+	getResult: Kleisli[F, CacheMap, DedupedFetch[F, A]]
+)
+				</code></pre>
+			</section>
+			<section>
+				<pre><code class="hljs scala" data-trim>
+//LazyBatch will auto-batch requests
+def fetch(i: Int) = LazyBatch.single(intFetch)(i)
+
+(fetch(1), fetch(2), fetch(3)).tupled
+
+//LazyFetch forms a Parallel with LazyBatch
+List(5, 6, 7).parTraverse(_.fetchLazy(intFetch))
+
+//Equivalent to a manual batch
+LazyBatch.many(intFetch)(Set(5, 6, 7))
+				</code></pre>
+			</section>
+			<section>
+				<h3>Layers</h3>
+				<p>In order of speed:</p>
+				<ol>
+					<li>Immediate fetching with manual syntax</li>
+					<li>Linear deduping that gets a little clumsy</li>
+					<li>Lazy monadic deduping</li>
+					<li>Lazy applicative batching, incl. a Parallel instance</li>
+				</ol>
+			</section>
+			<section>
+				<p>Other additions</p>
+				<pre><code class="hljs scala" data-trim>
+//Fetch instances determine parallelism, can be hard-coded
+object Fetch {
+	def singleParallel[F[_]: Monad: Parallel, I, A](
+		fetchId: String
+	)(f: I => F[Option[A]]): Fetch[F, I, A]
+}
+
+object LazyFetch {
+	//Interleve effects between individual fetches
+	def liftF[F[_]: FlatMap](fa: F[A])
+}
+				</code></pre>
+			</section>
+			<section>
+				<pre><code class="hljs scala" data-trim>
+case class LazyFetch[F[_]: FlatMap, A](...) {
+	//No requirements to run after creating
+	def run: F[DedupedFetch[F, A]]
+}
+
+case class LazyBatch[F[_]: Applicative, A](...) {
+	//Some still needed for LazyBatch
+	def run(implicit M: Monad[F], P: Parallel[F])
+}
+				</code></pre>
+			</section>
+			<section>
+				<h3>Philosophy Argument</h3>
+				<ul>
+					<li class="fragment">You can not optimize flatMap, <code>>></code>-style code anyway</li>
+					<li class="fragment">Users are more and more used to parallelizing by-default (parTupled, parTraverse)</li>
+					<li class="fragment">Giving opportunities for optimization also means more flexibility</li>
+				</ul>
+			</section>
+			<section>
+				<h3>In Summary</h3>
+				<ul>
+					<li>TF is easier, faster, less code, more flexible, but...</li>
+					<li>You still need effects (data types) to propagate context!</li>
+				</ul>
+			</section>
+			<section>
+				<p>Code is @ <a href="https://github.com/sloshy/fetchless">github.com/sloshy/fetchless</a></p>
+				<p>Slides are up @ <a href="https://slides.rpeters.dev/fetchless">slides.rpeters.dev/fetchless</a></p>
+				<p>Thank you!</p>
+			</section>
+		</div>
+	</div>
+
+	<script src="dist/reveal.js"></script>
+	<script src="plugin/notes/notes.js"></script>
+	<script src="plugin/markdown/markdown.js"></script>
+	<script src="plugin/highlight/highlight.js"></script>
+	<script>
+		// More info about initialization & config:
+		// - https://revealjs.com/initialization/
+		// - https://revealjs.com/config/
+		Reveal.initialize({
+			hash: true,
+
+			// Learn about plugins: https://revealjs.com/plugins/
+			plugins: [RevealMarkdown, RevealHighlight, RevealNotes]
+		});
+	</script>
+</body>
+
+</html>
