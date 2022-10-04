@@ -1,0 +1,433 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<title>reveal.js</title>
+
+	<link rel="stylesheet" href="dist/reset.css">
+	<link rel="stylesheet" href="dist/reveal.css">
+	<link rel="stylesheet" href="dist/theme/black.css">
+
+	<!-- Theme used for syntax highlighted code -->
+	<link rel="stylesheet" href="plugin/highlight/monokai.css">
+</head>
+
+<body>
+	<div class="reveal">
+		<div class="slides">
+			<section>
+				<h2>Fetchless</h2>
+				<h3>A New Take on Data Retrieval</h3>
+				<h4>Ryan Peters @ 47 Degrees</h4>
+			</section>
+			<section>
+				<h3>Back in 2016...</h3>
+				<p><a
+						href="https://www.47deg.com/blog/fetch-scala-library/#introducing-fetch-a-new-scala-library-for-simple-and-efficient-data-access-0">Fetch
+						was born!</a></p>
+				<ul>
+					<li>Optimizes requests for data</li>
+					<li>Batches independent requests</li>
+					<li>Deduplicates requests for the same item</li>
+					<li>Ensures parallel execution</li>
+				</ul>
+				<p>Influenced by Haxl and Stitch libraries</p>
+				<!--TODO: put site in here-->
+			</section>
+			<section>
+				<pre><code class="hljs scala" data-trim>
+					//Represents a K/V store where strings have an integer ID
+					val dataSource: DataSource[IO, Int, String] = ???
+					
+					def fetch(i: Int) = Fetch.optional(i, dataSource)
+					
+					//Fetches both 1 and 2, at once
+					//Deduplicates the second request for 1
+					val dedupedFetch = (fetch(1), fetch(2), fetch(1)).tupled
+					
+					Fetch.run(dedupedFetch).map {
+						case (Some(first), Some(second), Some(firstAgain)) => ???
+						//And so on...
+					}
+									</code></pre>
+			</section>
+			<section>
+				<p>Fetch, like many libraries, is a DSL</p>
+				<p>See:
+					<a href="https://www.youtube.com/watch?v=7kYqH5XTP18">"Your Program Is a Language" - ScalaCon
+						2021</a>
+				</p>
+			</section>
+			<section>
+				<h3>TL;DW</h3>
+				<ul>
+					<li>Domain Specific Languages encode domain-specific business logic</li>
+					<li>Libraries are usually embedded DSLs</li>
+					<li>Embedded DSLs are easy (and fun) to write</li>
+					<li>You should prefer Tagless Final style whenever possible</li>
+				</ul>
+			</section>
+			<section>
+				<p>Generally two ways of encoding embedded DSLs:</p>
+				<ul>
+					<li>"Free" style - operations are data, and you pass them to "interpreters"</li>
+					<li>"Tagless final" style - operations are methods defined in terms of their interpreters</li>
+				</ul>
+			</section>
+			<section>
+				<h3>"Free" vs "TF" in practice</h3>
+				<pre><code class="hljs scala" data-trim>
+//"Free" - operations as data ("reified") w/ interpreter
+sealed trait MyDSL[A]
+case class MyOperation(param1: String, param2: Int)
+  extends MyDSL[Unit]
+
+def myDslInterpreter(op: MyOperation[A]): IO[A] = ???
+
+//"TF" - have an abstract effect type for your interpreter
+trait MyDSL[F[_]]:
+  def myOperation(param1: String, param2: Int): F[Unit]
+
+object MyDSL:
+  def impl[F[_]: Sync] = new MyDSL[F] { ... }
+				</code></pre>
+			</section>
+			<section>
+				<h3>Takeaways:</h3>
+				<p>Tagless Final style:</p>
+				<ul>
+					<li>is more efficient overall</li>
+					<li>lets you have an "extensible DSL"</li>
+					<li>more familiar w/ less indirection</li>
+				</ul>
+			</section>
+			<section>
+				<h3>The Fetch 3.0 Incident</h3>
+				<p>Fetch builds started failing in late 2021</p>
+				<p>Cause seemed to be an upgrade to Cats 2.7</p>
+				<p>What happened?</p>
+			</section>
+			<section>
+				<h3>Applicative vs Monad</h3>
+				<p>Applicative:</p>
+				<ul>
+					<li>Used for independent effects</li>
+					<li>Good for aggregating, not dependency</li>
+				</ul>
+				<p>Monad:</p>
+				<ul>
+					<li>Used for dependent effects</li>
+					<li>Good for dependency, not for aggregating</li>
+				</ul>
+			</section>
+			<section>
+				<p>Either (Monad) vs Validated (Applicative)</p>
+				<pre><code class="hljs scala" data-trim>
+List(Right(1), Left(2), Right(3), Left(4)).sequence
+//Left(2)
+//Traversing implies using 'flatMap' semantics
+
+List(
+	Valid(1),
+	Invalid(NonEmptyChain(2)),
+	Valid(3),
+	Invalid(NonEmptyChain(2))
+).sequence
+//Invalid(NonEmptyChain(2, 4))
+//Traversing cannot flatMap, thus no short-circuiting
+				</code></pre>
+			</section>
+			<section>
+				<h3>Root Cause:</h3>
+				<p>Fetch was pretending to be a Monad while <a href="https://github.com/47degrees/fetch/pull/613">skirting Monad
+						laws</a></p>
+				<p>Issue was "resolved" as of Fetch 3.1 by <a
+						href="https://github.com/47degrees/fetch/commit/c8d980dbc32056037919a96bb3d9a942c86c28f4">overriding a Cats
+						implementation detail</a> (ugly!)</p>
+			</section>
+			<section>
+				<h3>Introducing... Fetchless!</h3>
+				<ul>
+					<li>"Tagless Final first" design</li>
+					<li>No sneaky tricks, entirely lawful</li>
+					<li>Replicates (most of) feature set w/ syntax</li>
+				</ul>
+			</section>
+			<section>
+				<p>The "Fetch" Algebra</p>
+				<pre><code class="hljs scala" data-trim>
+trait Fetch[F[_], I, A]:
+  def single(i: I): F[Option[A]]
+	def singleDedupe(i: I): F[DedupedRequest[F, Option[A]]]
+	def singleLazy(i: I): LazyRequest[F, Option[A]]
+	def batch(iSet: Set[I]): F[Map[I, A]]
+	//And so on...
+				</code></pre>
+			</section>
+			<section>
+				<h3>Opinionated Decisions:</h3>
+				<ul>
+					<li class="fragment">All requests are optional</li>
+					<li class="fragment">Deduplication is optional</li>
+					<li class="fragment">Laziness is optional</li>
+					<li class="fragment">EVERYTHING IS OPTIONAL!!!</li>
+				</ul>
+			</section>
+			<section>
+				<section>
+					<h3>Other changes:</h3>
+					<pre><code class="hljs scala" data-trim>
+trait DataSource[F[_], I, A]:
+  ...
+	def batch(ids: NonEmptyList[I]): F[Map[I, A]]
+  ...
+				</code></pre>
+					<p>Why not use Set?</p>
+					<pre><code class="hljs scala" data-trim>
+					def batch(iSet: Set[I]): F[Map[I, A]]
+					</code></pre>
+					<p>Set automatically deduplicates requests</p>
+				</section>
+				<section>
+					<pre><code class="hljs scala" data-trim>
+						trait DataSource[F[_], I, A]:
+							//Smell like implementation details
+							def batchExecution: BatchExecution //i.e. 'InParallel'
+										</code></pre>
+					<p>Changed to smart constructors</p>
+					<pre><code class="hljs scala" data-trim>
+object Fetch:
+  //Batches are turned into single fetches
+  def singleSequenced[F[_]: Monad, I, A](fetchId: String)(
+		f: I => F[Option[A]]
+	): Fetch[F, I, A]
+	def singleParallel[F[_]: Monad: Parallel, I, A](fetchId: String)(
+		f: I => F[Option[A]]
+	): Fetch[F, I, A]
+
+	//Single fetches are done in terms of a batch
+	def batchOnly[F[_]: Monad, I, A](fetchId: String)(
+		batchFunction: Set[I] => F[Map[I, A]]
+	)
+										</code></pre>
+				</section>
+				<section>
+					<p>Fetch requires heavy capabilities when ran</p>
+					<pre><code class="hljs scala" data-trim>
+//Slightly simplified from the source code
+def run[F[_]: Concurrent: Clock, A](fa: Fetch[F, A])
+					</code></pre>
+					<p>Fetchless captures these constraints in your algebra</p>
+				</section>
+				<section>
+					<p>Fetchless is extensible by default</p>
+					<p>Requests can be interleaved with other effects</p>
+					<pre><code class="hljs scala" data-trim>
+def runOrTimeout(dur: FiniteDuration)(fa: F[A]): F[A]
+
+val fetch: Fetch[F, Int, String]
+
+val first = runOrTimeout(fetch.singleDedupe(1))
+val second = runOrTimeout(first.alsoBatch(Set(2, 3, 4)))
+					</code></pre>
+				</section>
+			</section>
+			<section>
+				<h3>Change to Execution Model</h3>
+				<p>Fetch == "lazy by default", no opting out</p>
+				<p>Fetchless == "linear by default", lazy opt-in</p>
+			</section>
+			<section>
+				<p>Fetch would automatically batch the following:</p>
+				<pre><code class="hljs scala" data-trim>
+def fetch(i: Int): Fetch[IO, String] //Data type, not algebra
+List(1, 2, 3).traverse(i => fetch(i))
+				</code></pre>
+				<p>Fetchless needs syntax for the same</p>
+				<pre><code class="hljs scala" data-trim>
+implicit val instance: Fetch[IO, Int, String]
+List(1, 2, 3).fetchAll(instance)
+List(1, 2, 3).fetchAll[IO, String] //Can also use implicits
+				</code></pre>
+				<p>This is due to lawfulness requirements</p>
+			</section>
+			<section>
+				<h3>Deduping</h3>
+				<pre><code class="hljs scala" data-trim>
+// K/V is: (requestId, fetchId) -> optionResult
+type CacheMap = Map[(Any, FetchId), Option[Any]]
+
+final case class FetchCache(
+	cacheMap: CacheMap,
+	...
+)
+
+final case class DedupedRequest[F[_], A](
+	unsafeCache: FetchCache,
+	last: A
+)
+				</code></pre>
+				<p>Opt into deduplicating requests without laziness</p>
+			</section>
+			<section>
+				<h3>Laziness</h3>
+				<pre><code class="hljs scala" data-trim>
+					final case class LazyRequest[F[_], A](
+						k: Kleisli[F, FetchCache, LazyRequest.ReqInfo[F, A]]
+					)
+
+					sealed trait ReqInfo[F[_], A] {
+						val prevCache: FetchCache
+						def updateCache(extra: FetchCache): ReqInfo[F, A]
+						...
+					}
+
+					final case class FetchReqInfo[F[_], A](...) 
+					  extends ReqInfo[F, A]
+					final case class LiftedReqInfo[F[_], A](...)
+					  extends ReqInfo[F, A] //And so on...
+				</code></pre>
+				<p>ReqInfo has everything a request needs to run</p>
+			</section>
+			<section>
+				<h3>Lazy Batching</h3>
+				<p>Fetchless requires Parallel for lazy batching</p>
+				<pre><code class="hljs scala" data-trim>
+def lazy(i: Int): LazyRequest[F, Option[String]]
+
+(lazy(1), lazy(2), lazy(3)).tupled //Does NOT batch
+(lazy(1), lazy(2), lazy(3)).parTupled //DOES batch
+
+List(lazy(1), lazy(2), lazy(3)).sequence //Does NOT batch
+List(lazy(1), lazy(2), lazy(3)).parSequence //DOES batch
+
+//Does not need parallel, custom syntax
+List(1, 2, 3).fetchAllLazy[F, String]
+				</code></pre>
+			</section>
+			<section>
+				<section>
+					<h3>Bonus Integrations</h3>
+					<p>Streaming Data w/ FS2</p>
+					<pre><code class="hljs scala" data-trim>
+trait StreamingFetch[F[_], I, A] extends Fetch[F, I, A]:
+	def streamingBatch(
+		iSet: Set[I]
+	): Stream[F, (I, Option[A])]
+
+	def streamingBatchFilterOption(
+		iSet: Set[I]
+	): Stream[F, (I, A)]
+				</code></pre>
+					<p>+ Smart constructors to customize/convert instances</p>
+				</section>
+				<section>
+					<p>Doobie SQL Queries</p>
+					<pre><code class="hljs scala" data-trim>
+final case class Row(...)
+val getSingleRow: Query[Int, Row]
+val getManyRows: Set[I] => Query0[(I, A)]
+val tx: Transactor[F]
+
+val fetch: StreamingFetch[ConnectionIO, Int, Row] =
+  DoobieFetch
+	  .forBatchableQuery("doobie")(getSingleRow)(getManyRows)
+
+val txFetch: StreamingFetch[F, Int, Row] =
+  DoobieFetch.forBatchableQueryTransact(
+		"doobieTx",
+		xa
+	)(getSingleRow)(getManyRows)
+					</code></pre>
+				</section>
+				<section>
+					<p>http4s client requests</p>
+					<pre><code class="hljs scala" data-trim>
+final case class MyEntity(...)
+val client: Client[F]
+def makeRequest(i: Int): Request[F]
+implicit ed: EntityDecoder[F, MyEntity]
+
+val fetch = Http4sClientFetch
+  .forEntityParallel[F, Int, MyEntity](
+		"http4s", 
+		client
+	)(makeRequest)
+					</code></pre>
+					<p>Also supports batchable entities</p>
+				</section>
+				<section>
+					<p>Fetch ALL THE THINGS!</p>
+					<pre><code class="hljs scala" data-trim>
+trait AllFetch[F[_], I, A] extends Fetch[F, I, A]:
+	def batchAll: F[Map[I, A]]
+					</code></pre>
+					<p>Also works with streaming, doobie, etc</p>
+					<p>Can wrap existing instances</p>
+				</section>
+			</section>
+			<section>
+				<p>Debugging support</p>
+				<pre><code class="hljs scala" data-trim>
+sealed trait FetchType[I] //Multiple subtypes
+final case class DebugLog[I](
+	fetchId: String,
+	fetchTime: FiniteDuration,
+	fetchType: FetchType[I]
+)
+
+val instance: Fetch[IO, Int, String]
+val debugInstance = DebugFetch.wrap(instance)
+val doFetch =
+  debugInstance.single(1) *> debugInstance.batch((Set(2, 3)))
+
+doFetch *> debugInstance.flushLogs
+//Chain(DebugLog("id", 5 seconds, FetchType.Fetch), ...)
+				</code></pre>
+			</section>
+			<section>
+				<h3>Fetch vs Fetchless</h3>
+				<ul>
+					<li>Fetch has automatic, implicit batching, but...</li>
+					<li>Fetchless gets you mostly there w/ syntax</li>
+					<li>Fetchless is significantly faster</li>
+					<li>Fetchless is more flexible and lightweight</li>
+				</ul>
+			</section>
+			<section>
+				<p>Live benchmark demo time~</p>
+			</section>
+			<section>
+				<p>Fetch's "automatic batching" is imperfect</p>
+				<pre><code class="hljs scala" data-trim>
+def fetch(i: Int): Fetch[IO, String]
+
+fetch(1).flatMap(_ => fetch(2)) //NOT batched
+				</code></pre>
+				<p>Auto-batching is a hack, does not work with flatmap or for-comprehensions</p>
+				<p class="fragment">Honestly? Better to deal without it.</p>
+			</section>
+		</div>
+	</div>
+
+	<script src="dist/reveal.js"></script>
+	<script src="plugin/notes/notes.js"></script>
+	<script src="plugin/markdown/markdown.js"></script>
+	<script src="plugin/highlight/highlight.js"></script>
+	<script>
+		// More info about initialization & config:
+		// - https://revealjs.com/initialization/
+		// - https://revealjs.com/config/
+		Reveal.initialize({
+			hash: true,
+
+			// Learn about plugins: https://revealjs.com/plugins/
+			plugins: [RevealMarkdown, RevealHighlight, RevealNotes]
+		});
+	</script>
+</body>
+
+</html>
