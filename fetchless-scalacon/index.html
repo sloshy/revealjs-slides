@@ -60,26 +60,18 @@
 				<h3>What is Fetchless?</h3>
 				<ul>
 					<li>Started as a "tagless final port" of Fetch</li>
-					<li>Fetchless gets you mostly there w/ syntax</li>
-					<li>Fetchless is significantly faster</li>
-					<li>Fetchless is more flexible and lightweight</li>
+					<li>Replaces implicit "magic" with explicit syntax</li>
+					<li>Order of magnitude faster</li>
+					<li>More lightweight and flexible</li>
 				</ul>
 			</section>
 			<section>
-				<p>Fetch, like many libraries, is a DSL</p>
+				<p>Fetch is a DSL for data retreival.</p>
+				<p>Fetchless is a different encoding of those same ideas.</p>
 				<p>See:
 					<a href="https://www.youtube.com/watch?v=7kYqH5XTP18">"Your Program Is a Language" - ScalaCon
 						2021</a>
 				</p>
-			</section>
-			<section>
-				<h3>TL;DW</h3>
-				<ul>
-					<li>Domain Specific Languages encode domain-specific business logic</li>
-					<li>Libraries are usually embedded DSLs</li>
-					<li>Embedded DSLs are easy (and fun) to write</li>
-					<li>You should prefer Tagless Final style whenever possible</li>
-				</ul>
 			</section>
 			<section>
 				<p>Generally two ways of encoding embedded DSLs:</p>
@@ -96,7 +88,7 @@ sealed trait MyDSL[A]
 case class MyOperation(param1: String, param2: Int)
   extends MyDSL[Unit]
 
-def myDslInterpreter(op: MyOperation[A]): IO[A] = ???
+def myDslInterpreter[F[_]: Sync](op: MyOperation[A]): F[A]
 
 //"TF" - have an abstract effect type for your interpreter
 trait MyDSL[F[_]]:
@@ -110,9 +102,8 @@ object MyDSL:
 				<h3>Takeaways:</h3>
 				<p>Tagless Final style:</p>
 				<ul>
-					<li>is more efficient overall</li>
-					<li>lets you have an "extensible DSL"</li>
-					<li>more familiar w/ less indirection</li>
+					<li>Is more efficient overall</li>
+					<li>Lets you have an "extensible DSL"</li>
 				</ul>
 			</section>
 			<section>
@@ -139,7 +130,7 @@ object MyDSL:
 				<pre><code class="hljs scala" data-trim>
 List(Right(1), Left(2), Right(3), Left(4)).sequence
 //Left(2)
-//Traversing implies using 'flatMap' semantics
+//Traversing implies 'flatMap' by law, short-circuits
 
 List(
 	Valid(1),
@@ -148,7 +139,7 @@ List(
 	Invalid(NonEmptyChain(2))
 ).sequence
 //Invalid(NonEmptyChain(2, 4))
-//Traversing cannot flatMap, thus no short-circuiting
+//Traversing cannot flatMap, no short-circuiting
 				</code></pre>
 			</section>
 			<section>
@@ -183,65 +174,6 @@ trait Fetch[F[_], I, A]:
 	def batch(iSet: Set[I]): F[Map[I, A]]
 	//And so on...
 				</code></pre>
-			</section>
-			<section>
-				<section>
-					<h3>Other changes:</h3>
-					<pre><code class="hljs scala" data-trim>
-trait DataSource[F[_], I, A]:
-  ...
-	def batch(ids: NonEmptyList[I]): F[Map[I, A]]
-  ...
-				</code></pre>
-					<p>Why not use Set?</p>
-					<pre><code class="hljs scala" data-trim>
-					def batch(iSet: Set[I]): F[Map[I, A]]
-					</code></pre>
-					<p>Set automatically deduplicates requests</p>
-				</section>
-				<section>
-					<pre><code class="hljs scala" data-trim>
-						trait DataSource[F[_], I, A]:
-							//Smell like implementation details
-							def batchExecution: BatchExecution //i.e. 'InParallel'
-										</code></pre>
-					<p>Changed to smart constructors</p>
-					<pre><code class="hljs scala" data-trim>
-object Fetch:
-  //Batches are turned into single fetches
-  def singleSequenced[F[_]: Monad, I, A](fetchId: String)(
-		f: I => F[Option[A]]
-	): Fetch[F, I, A]
-	def singleParallel[F[_]: Monad: Parallel, I, A](fetchId: String)(
-		f: I => F[Option[A]]
-	): Fetch[F, I, A]
-
-	//Single fetches are done in terms of a batch
-	def batchOnly[F[_]: Monad, I, A](fetchId: String)(
-		batchFunction: Set[I] => F[Map[I, A]]
-	)
-										</code></pre>
-				</section>
-				<section>
-					<p>Fetch requires heavy capabilities when ran</p>
-					<pre><code class="hljs scala" data-trim>
-//Slightly simplified from the source code
-def run[F[_]: Concurrent: Clock, A](fa: Fetch[F, A])
-					</code></pre>
-					<p>Fetchless captures these constraints in your algebra</p>
-				</section>
-				<section>
-					<p>Fetchless is extensible by default</p>
-					<p>Requests can be interleaved with other effects</p>
-					<pre><code class="hljs scala" data-trim>
-def runOrTimeout(dur: FiniteDuration)(fa: F[A]): F[A]
-
-val fetch: Fetch[F, Int, String]
-
-val first = runOrTimeout(fetch.singleDedupe(1))
-val second = runOrTimeout(first.alsoBatch(Set(2, 3, 4)))
-					</code></pre>
-				</section>
 			</section>
 			<section>
 				<h3>Change to Execution Model</h3>
@@ -301,6 +233,64 @@ List(lazy(1), lazy(2), lazy(3)).parSequence //DOES batch
 //Does not need parallel, custom syntax
 List(1, 2, 3).fetchAllLazy[F, String]
 				</code></pre>
+			</section>
+			<section>
+				<section>
+					<h3>Other changes:</h3>
+					<pre><code class="hljs scala" data-trim>
+trait DataSource[F[_], I, A]:
+  ...
+	def batch(ids: NonEmptyList[I]): F[Map[I, A]]
+  ...
+				</code></pre>
+					<p>Why not use Set?</p>
+					<pre><code class="hljs scala" data-trim>
+					def batch(iSet: Set[I]): F[Map[I, A]]
+					</code></pre>
+					<p>Set automatically deduplicates requests</p>
+				</section>
+				<section>
+					<pre><code class="hljs scala" data-trim>
+						trait DataSource[F[_], I, A]:
+							//Smell like implementation details
+							def batchExecution: BatchExecution //i.e. 'InParallel'
+										</code></pre>
+					<p>Changed to smart constructors</p>
+					<pre><code class="hljs scala" data-trim>
+object Fetch:
+  //Batches are turned into single fetches
+  def singleSequenced[F[_]: Monad, I, A](fetchId: String)(
+		f: I => F[Option[A]]
+	): Fetch[F, I, A]
+	def singleParallel[F[_]: Monad: Parallel, I, A](fetchId: String)(
+		f: I => F[Option[A]]
+	): Fetch[F, I, A]
+
+	//Single fetches are done in terms of a batch
+	def batchOnly[F[_]: Monad, I, A](fetchId: String)(
+		batchFunction: Set[I] => F[Map[I, A]]
+	)
+										</code></pre>
+				</section>
+				<section>
+					<p>Fetch requires heavy capabilities when ran</p>
+					<pre><code class="hljs scala" data-trim>
+//Slightly simplified from the source code
+def run[F[_]: Concurrent: Clock, A](fa: Fetch[F, A])
+					</code></pre>
+					<p>Fetchless captures these constraints in your algebra</p>
+				</section>
+				<section>
+					<p>Requests can be interleaved with other effects</p>
+					<pre><code class="hljs scala" data-trim>
+def runOrTimeout(dur: FiniteDuration)(fa: F[A]): F[A]
+
+val fetch: Fetch[F, Int, String]
+
+val first = runOrTimeout(fetch.singleDedupe(1))
+val second = runOrTimeout(first.alsoBatch(Set(2, 3, 4)))
+					</code></pre>
+				</section>
 			</section>
 			<section>
 				<section>
