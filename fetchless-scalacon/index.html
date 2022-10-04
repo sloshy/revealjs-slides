@@ -21,7 +21,7 @@
 			<section>
 				<h2>Fetchless</h2>
 				<h3>A New Take on Data Retrieval</h3>
-				<h4>Ryan Peters @ 47 Degrees</h4>
+				<h4>Ryan Peters @ 47 Degrees / Xebia Functional</h4>
 			</section>
 			<section>
 				<h3>Back in 2016...</h3>
@@ -46,13 +46,22 @@
 					
 					//Fetches both 1 and 2, at once
 					//Deduplicates the second request for 1
-					val dedupedFetch = (fetch(1), fetch(2), fetch(1)).tupled
+					val dedupedFetch: Fetch[] = (fetch(1), fetch(2), fetch(1)).tupled
 					
 					Fetch.run(dedupedFetch).map {
 						case (Some(first), Some(second), Some(firstAgain)) => ???
 						//And so on...
 					}
 									</code></pre>
+			</section>
+			<section>
+				<h3>What is Fetchless?</h3>
+				<ul>
+					<li>Started as a "tagless final port" of Fetch</li>
+					<li>Fetchless gets you mostly there w/ syntax</li>
+					<li>Fetchless is significantly faster</li>
+					<li>Fetchless is more flexible and lightweight</li>
+				</ul>
 			</section>
 			<section>
 				<p>Fetch, like many libraries, is a DSL</p>
@@ -149,12 +158,18 @@ List(
 						implementation detail</a> (ugly!)</p>
 			</section>
 			<section>
-				<h3>Introducing... Fetchless!</h3>
-				<ul>
-					<li>"Tagless Final first" design</li>
-					<li>No sneaky tricks, entirely lawful</li>
-					<li>Replicates (most of) feature set w/ syntax</li>
-				</ul>
+				<p>Fetch would automatically batch the following:</p>
+				<pre><code class="hljs scala" data-trim>
+def fetch(i: Int): Fetch[IO, String] //Data type, not algebra
+List(1, 2, 3).traverse(i => fetch(i))
+				</code></pre>
+				<p>Fetchless needs syntax for the same</p>
+				<pre><code class="hljs scala" data-trim>
+implicit val instance: Fetch[IO, Int, String]
+List(1, 2, 3).fetchAll(instance)
+List(1, 2, 3).fetchAll[IO, String] //Can also use implicits
+				</code></pre>
+				<p>This is due to lawfulness requirements</p>
 			</section>
 			<section>
 				<p>The "Fetch" Algebra</p>
@@ -166,15 +181,6 @@ trait Fetch[F[_], I, A]:
 	def batch(iSet: Set[I]): F[Map[I, A]]
 	//And so on...
 				</code></pre>
-			</section>
-			<section>
-				<h3>Opinionated Decisions:</h3>
-				<ul>
-					<li class="fragment">All requests are optional</li>
-					<li class="fragment">Deduplication is optional</li>
-					<li class="fragment">Laziness is optional</li>
-					<li class="fragment">EVERYTHING IS OPTIONAL!!!</li>
-				</ul>
 			</section>
 			<section>
 				<section>
@@ -239,20 +245,6 @@ val second = runOrTimeout(first.alsoBatch(Set(2, 3, 4)))
 				<h3>Change to Execution Model</h3>
 				<p>Fetch == "lazy by default", no opting out</p>
 				<p>Fetchless == "linear by default", lazy opt-in</p>
-			</section>
-			<section>
-				<p>Fetch would automatically batch the following:</p>
-				<pre><code class="hljs scala" data-trim>
-def fetch(i: Int): Fetch[IO, String] //Data type, not algebra
-List(1, 2, 3).traverse(i => fetch(i))
-				</code></pre>
-				<p>Fetchless needs syntax for the same</p>
-				<pre><code class="hljs scala" data-trim>
-implicit val instance: Fetch[IO, Int, String]
-List(1, 2, 3).fetchAll(instance)
-List(1, 2, 3).fetchAll[IO, String] //Can also use implicits
-				</code></pre>
-				<p>This is due to lawfulness requirements</p>
 			</section>
 			<section>
 				<h3>Deduping</h3>
@@ -389,26 +381,22 @@ doFetch *> debugInstance.flushLogs
 				</code></pre>
 			</section>
 			<section>
-				<h3>Fetch vs Fetchless</h3>
-				<ul>
-					<li>Fetch has automatic, implicit batching, but...</li>
-					<li>Fetchless gets you mostly there w/ syntax</li>
-					<li>Fetchless is significantly faster</li>
-					<li>Fetchless is more flexible and lightweight</li>
-				</ul>
-			</section>
-			<section>
 				<p>Live benchmark demo time~</p>
 			</section>
 			<section>
-				<p>Fetch's "automatic batching" is imperfect</p>
-				<pre><code class="hljs scala" data-trim>
-def fetch(i: Int): Fetch[IO, String]
-
-fetch(1).flatMap(_ => fetch(2)) //NOT batched
-				</code></pre>
-				<p>Auto-batching is a hack, does not work with flatmap or for-comprehensions</p>
-				<p class="fragment">Honestly? Better to deal without it.</p>
+				<h3>What's Next?</h3>
+				<ul>
+					<li>Creating docs/website</li>
+					<li>Formalizing benchmarks</li>
+					<li>Publishing the library</li>
+				</ul>
+				<p>Accessible @ <a href="https://github.com/47degrees/fetchless">github.com/47degrees/fetchless</a></p>
+			</section>
+			<section>
+				<p>Thank you for joining!</p>
+				<p>Slides are up @ <a
+						href="https://slides.rpeters.dev/fetchless-scalacon/">slides.rpeters.dev/fetchless-scalacon/</a>
+				</p>
 			</section>
 		</div>
 	</div>
