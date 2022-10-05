@@ -152,7 +152,7 @@ List(
 			<section>
 				<p>Fetch would automatically batch the following:</p>
 				<pre><code class="hljs scala" data-trim>
-def fetch(i: Int): Fetch[IO, String] //Data type, not algebra
+def fetch(i: Int): Fetch[IO, String]
 List(1, 2, 3).traverse(i => fetch(i))
 				</code></pre>
 				<p>Fetchless needs syntax for the same</p>
