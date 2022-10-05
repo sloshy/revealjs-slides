@@ -39,7 +39,6 @@
 			</section>
 			<section>
 				<pre><code class="hljs scala" data-trim>
-					//Represents a K/V store where strings have an integer ID
 					val dataSource: DataSource[IO, Int, String] = ???
 					
 					def fetch(i: Int): Fetch[IO, Option[String]] =
@@ -47,10 +46,10 @@
 					
 					//Fetches both 1 and 2, at once
 					//Deduplicates the second request for 1
-					val dedupedFetch: Fetch[IO, (Option[String], Option[String], Option[String])] =
+					val myFetch: Fetch[IO, (Option[String], Option[String], Option[String])] =
 					  (fetch(1), fetch(2), fetch(1)).tupled
 					
-					Fetch.run(dedupedFetch).map {
+					Fetch.run(myFetch).map {
 						case (Some(first), Some(second), Some(firstAgain)) => ???
 						//And so on...
 					}
@@ -216,7 +215,6 @@ final case class DedupedRequest[F[_], A](
 					final case class LiftedReqInfo[F[_], A](...)
 					  extends ReqInfo[F, A] //And so on...
 				</code></pre>
-				<p>ReqInfo has everything a request needs to run</p>
 			</section>
 			<section>
 				<h3>Lazy Batching</h3>
